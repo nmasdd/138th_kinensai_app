@@ -1,8 +1,10 @@
 import { Tabs } from "expo-router";
 import { Image } from "react-native";
+import { ReservationProvider } from "../context/ReservationContext";
 
 export default function RootLayout() {
   return (
+    <ReservationProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -105,5 +107,6 @@ export default function RootLayout() {
         }}
       />
     </Tabs>
+    </ReservationProvider>
   );
 }
