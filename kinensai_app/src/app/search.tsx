@@ -1,129 +1,70 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
   TextInput,
-  SectionList,
+  FlatList,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Modal,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Header from './components/Header';
-import { useReservation } from '../context/ReservationContext';
-import type { Exhibition } from '../utils/types';
+import Header from '../components/Header';
+import ExhibitionDetailModal, { ticketLabel } from '../components/ExhibitionDetailModal';
+import { loadAllExhibitions } from '../data/exhibitions';
+import { useFavorites } from '../data/favorites';
+import { theme } from '../theme';
 
-const dayLabel: Record<string, string> = {
-  saturday: '土曜日',
-  sunday: '日曜日',
+type KindFilter = 'all' | 'class' | 'volunteer';
+
+const KIND_LABEL: Record<KindFilter, string> = {
+  all: 'すべて',
+  class: 'クラス企画',
+  volunteer: '有志企画',
 };
 
-const PEOPLE_OPTIONS = [1, 2, 3, 4, 5] as const;
-
 export default function SearchScreen() {
-  const { exhibitions, isLoading, reservations, reserve, cancel, isReserved, effectiveReserved } = useReservation();
+  const [exhibitions, setExhibitions] = useState<Awaited<ReturnType<typeof loadAllExhibitions>>>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
-  const [selectedExhibitionId, setSelectedExhibitionId] = useState<string | null>(null);
+  const [kind, setKind] = useState<KindFilter>('all');
+  const [favOnly, setFavOnly] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedCounts, setSelectedCounts] = useState<Record<string, number>>({});
+  const { isFavorite, toggle } = useFavorites();
 
-  const selectedExhibition = useMemo(
-    () => (selectedExhibitionId ? exhibitions.find((ex) => ex.id === selectedExhibitionId) ?? null : null),
-    [exhibitions, selectedExhibitionId],
-  );
+  useEffect(() => {
+    loadAllExhibitions()
+      .catch(() => [])
+      .then((list) => setExhibitions([...list].sort(() => Math.random() - 0.5)))
+      .finally(() => setIsLoading(false));
+  }, []);
 
-  const countKey = (exId: string, slotIndex: number) => `${exId}_${slotIndex}`;
-
-  const getCount = (exId: string, slotIndex: number) =>
-    selectedCounts[countKey(exId, slotIndex)] ?? 1;
-
-  const setCount = (exId: string, slotIndex: number, count: number) =>
-    setSelectedCounts((prev) => ({ ...prev, [countKey(exId, slotIndex)]: count }));
-
-  const filteredExhibitions = useMemo(() => {
-    if (!query.trim()) return exhibitions;
-    const q = query.toLowerCase();
-    return exhibitions.filter(
-      (ex) =>
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return exhibitions.filter((ex) => {
+      if (kind !== 'all' && ex.kind !== kind) return false;
+      if (favOnly && !isFavorite(ex.id)) return false;
+      if (!q) return true;
+      return (
         ex.className.toLowerCase().includes(q) ||
         ex.projectName.toLowerCase().includes(q) ||
         ex.description.toLowerCase().includes(q)
-    );
-  }, [exhibitions, query]);
+      );
+    });
+  }, [exhibitions, query, kind, favOnly, isFavorite]);
 
-  const sections = useMemo(() => {
-    const saturday = filteredExhibitions.filter((ex) => ex.day === 'saturday');
-    const sunday = filteredExhibitions.filter((ex) => ex.day === 'sunday');
-    return [
-      { title: '土曜日', data: saturday },
-      { title: '日曜日', data: sunday },
-    ];
-  }, [filteredExhibitions]);
-
-  const handleReserveSlot = (exhibition: Exhibition, slotIndex: number) => {
-    const count = getCount(exhibition.id, slotIndex);
-    reserve(exhibition, slotIndex, count);
-  };
-
-  const handleCancelSlot = (exhibition: Exhibition, slotIndex: number) => {
-    const slot = exhibition.timeSlots[slotIndex];
-    Alert.alert('予約をキャンセルしますか？', `${exhibition.className} ${slot.start}〜${slot.end}`, [
-      { text: '戻る', style: 'cancel' },
-      {
-        text: 'キャンセルする',
-        style: 'destructive',
-        onPress: () => cancel(exhibition.id, slotIndex),
-      },
-    ]);
-  };
-
-  const handleCardPress = (exhibition: Exhibition) => {
-    setSelectedExhibitionId(exhibition.id);
-    setModalVisible(true);
-  };
-
-  const hasAnyReservation = (exhibitionId: string) =>
-    exhibitionId && reservations.some((r) => r.exhibitionId === exhibitionId);
-
-  const renderItem = ({ item }: { item: Exhibition }) => {
-    const hasReserved = hasAnyReservation(item.id);
-    return (
-      <TouchableOpacity
-        style={[styles.card, hasReserved && styles.cardReserved]}
-        onPress={() => handleCardPress(item)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.cardHeader}>
-          <View style={styles.badgeContainer}>
-            <Text style={styles.badge}>{dayLabel[item.day]}</Text>
-          </View>
-          <Text style={styles.className}>{item.className}</Text>
-          {hasReserved && <Text style={styles.reservedBadge}>✓ 予約済</Text>}
-        </View>
-        <Text style={styles.projectName}>{item.projectName}</Text>
-        <Text style={styles.description} numberOfLines={2}>
-          {item.description}
-        </Text>
-        <View style={styles.cardFooter}>
-          <Text style={styles.timeText}>
-            {item.timeSlots.length} 枠
-          </Text>
-          <Text style={styles.capacityText}>
-            {item.timeSlots.filter((s, i) => effectiveReserved(item, i) < s.capacity).length} 枠空き
-          </Text>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const selected = useMemo(
+    () => (selectedId ? exhibitions.find((ex) => ex.id === selectedId) ?? null : null),
+    [exhibitions, selectedId],
+  );
 
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <Header title="検索" />
         <View style={styles.centering}>
-          <ActivityIndicator size="large" color="#333333" />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       </SafeAreaView>
     );
@@ -132,7 +73,6 @@ export default function SearchScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Header title="検索" />
-
       <View style={styles.searchBar}>
         <TextInput
           style={styles.searchInput}
@@ -143,449 +83,134 @@ export default function SearchScreen() {
           autoCapitalize="none"
         />
         {query.length > 0 && (
-          <TouchableOpacity
-            style={styles.clearButton}
-            onPress={() => setQuery('')}
-          >
+          <TouchableOpacity onPress={() => setQuery('')}>
             <Text style={styles.clearButtonText}>✕</Text>
           </TouchableOpacity>
         )}
       </View>
-
+      <View style={styles.filters}>
+        {(Object.keys(KIND_LABEL) as KindFilter[]).map((k) => (
+          <TouchableOpacity
+            key={k}
+            style={[styles.chip, kind === k && styles.chipActive]}
+            onPress={() => setKind(k)}
+          >
+            <Text style={[styles.chipText, kind === k && styles.chipTextActive]}>{KIND_LABEL[k]}</Text>
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity
+          style={[styles.chip, favOnly && styles.chipActive]}
+          onPress={() => setFavOnly((v) => !v)}
+        >
+          <Text style={[styles.chipText, favOnly && styles.chipTextActive]}>★ お気に入り</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.resultInfo}>
         <Text style={styles.resultCount}>
-          {query.trim() ? `検索結果: ${filteredExhibitions.length}件` : `全 ${filteredExhibitions.length} 件の企画`}
+          {query.trim() ? `検索結果: ${filtered.length}件` : `全 ${filtered.length} 件の企画`}
         </Text>
       </View>
-
-      <SectionList
-        sections={sections}
+      <FlatList
+        data={filtered}
         keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        renderSectionHeader={({ section }) => (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderText}>{section.title}</Text>
-          </View>
-        )}
         contentContainerStyle={styles.list}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.7}
+            onPress={() => {
+              setSelectedId(item.id);
+              setModalVisible(true);
+            }}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={styles.badge}>{item.className}</Text>
+              <Text style={styles.kind}>{item.kind === 'class' ? 'クラス企画' : '有志企画'}</Text>
+              {isFavorite(item.id) && <Text style={styles.favBadge}>★</Text>}
+            </View>
+            <Text style={styles.projectName}>{item.projectName || '(タイトル未定)'}</Text>
+            <Text style={styles.description} numberOfLines={2}>
+              {item.description || '(説明準備中)'}
+            </Text>
+            <Text style={styles.ticket}>{ticketLabel(item)}</Text>
+          </TouchableOpacity>
+        )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {query.trim() ? '一致する企画が見つかりません' : '企画データがありません'}
-            </Text>
+            <Text style={styles.emptyText}>一致する企画が見つかりません</Text>
           </View>
         }
       />
-
-      <Modal
+      <ExhibitionDetailModal
+        exhibition={selected}
         visible={modalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => { setModalVisible(false); setSelectedExhibitionId(null); }}
-      >
-        {selectedExhibition && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>企画詳細</Text>
-                <TouchableOpacity onPress={() => { setModalVisible(false); setSelectedExhibitionId(null); }}>
-                  <Text style={styles.modalClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.modalBody}>
-                <View style={styles.modalBadgeRow}>
-                  <View style={styles.badgeContainer}>
-                    <Text style={styles.badge}>{dayLabel[selectedExhibition.day]}</Text>
-                  </View>
-                  <Text style={styles.modalClassName}>{selectedExhibition.className}</Text>
-                </View>
-
-                <Text style={styles.modalProjectName}>
-                  {selectedExhibition.projectName}
-                </Text>
-
-                <Text style={styles.modalDescription}>
-                  {selectedExhibition.description}
-                </Text>
-
-                <View style={styles.modalDivider} />
-
-                <Text style={styles.modalSectionLabel}>時間枠を選んで予約</Text>
-                {selectedExhibition.timeSlots.map((slot, i) => {
-                  const exId = selectedExhibition.id;
-                  const reserved = isReserved(exId, i);
-                  const effective = effectiveReserved(selectedExhibition, i);
-                  const remaining = slot.capacity - effective;
-                  const full = remaining <= 0;
-
-                  if (reserved) {
-                    const record = reservations.find(
-                      (r) => r.exhibitionId === exId && r.slotIndex === i
-                    );
-                    return (
-                      <View key={i} style={[styles.slotRow, styles.slotRowReserved]}>
-                        <View style={styles.slotInfo}>
-                          <Text style={styles.slotTime}>
-                            🕐 {slot.start} 〜 {slot.end}
-                          </Text>
-                          <Text style={[styles.slotAvailability, styles.slotReservedText]}>
-                            ✅ 予約済 ({record?.peopleCount ?? 1}人)
-                          </Text>
-                        </View>
-                        <TouchableOpacity onPress={() => handleCancelSlot(selectedExhibition, i)}>
-                          <Text style={styles.slotCancelButton}>取消</Text>
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  }
-
-                  if (full) {
-                    return (
-                      <View key={i} style={styles.slotRow}>
-                        <View style={styles.slotInfo}>
-                          <Text style={styles.slotTime}>
-                            🕐 {slot.start} 〜 {slot.end}
-                          </Text>
-                          <Text style={[styles.slotAvailability, styles.slotFull]}>満員</Text>
-                        </View>
-                      </View>
-                    );
-                  }
-
-                  const currentCount = getCount(exId, i);
-
-                  return (
-                    <View key={i} style={styles.slotRow}>
-                      <View style={styles.slotInfo}>
-                        <Text style={styles.slotTime}>
-                          🕐 {slot.start} 〜 {slot.end}
-                        </Text>
-                        <Text style={styles.slotAvailability}>
-                          残り {remaining}/{slot.capacity}
-                        </Text>
-                        <View style={styles.peopleRow}>
-                          <Text style={styles.peopleLabel}>人数: </Text>
-                          {PEOPLE_OPTIONS.map((n) => (
-                            <TouchableOpacity
-                              key={n}
-                              style={[
-                                styles.peopleButton,
-                                currentCount === n && styles.peopleButtonActive,
-                              ]}
-                              onPress={() => setCount(exId, i, n)}
-                            >
-                              <Text
-                                style={[
-                                  styles.peopleButtonText,
-                                  currentCount === n && styles.peopleButtonTextActive,
-                                ]}
-                              >
-                                {n}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.slotReserveButton}
-                        onPress={() => handleReserveSlot(selectedExhibition, i)}
-                      >
-                        <Text style={styles.slotReserveButtonText}>予約</Text>
-                      </TouchableOpacity>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-          </View>
-        )}
-      </Modal>
+        isFavorite={isFavorite}
+        onToggleFavorite={toggle}
+        onClose={() => {
+          setModalVisible(false);
+          setSelectedId(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  centering: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  container: { flex: 1, backgroundColor: theme.background },
+  centering: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     margin: 12,
+    marginBottom: 8,
     backgroundColor: '#ffffff',
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: theme.border,
     paddingHorizontal: 12,
     height: 44,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: '#333333',
-    padding: 0,
-  },
-  clearButton: {
-    paddingLeft: 8,
-  },
-  clearButtonText: {
-    fontSize: 16,
-    color: '#999999',
-  },
-  resultInfo: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  resultCount: {
-    fontSize: 13,
-    color: '#888888',
-  },
-  list: {
+  searchInput: { flex: 1, fontSize: 15, color: theme.text },
+  clearButtonText: { fontSize: 16, color: '#999999', paddingLeft: 8 },
+  filters: { flexDirection: 'row', paddingHorizontal: 12, paddingBottom: 8, gap: 8 },
+  chip: {
     paddingHorizontal: 12,
-    paddingBottom: 20,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: '#ffffff',
   },
+  chipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+  chipText: { fontSize: 13, fontWeight: '600', color: theme.text },
+  chipTextActive: { color: '#ffffff' },
+  resultInfo: { paddingHorizontal: 16, paddingBottom: 8 },
+  resultCount: { fontSize: 13, color: theme.muted },
+  list: { paddingHorizontal: 12, paddingBottom: 20 },
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: theme.border,
   },
-  cardReserved: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#208AEF',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  badgeContainer: {
-    marginRight: 8,
-  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 },
   badge: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#ffffff',
-    backgroundColor: '#208AEF',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
+    backgroundColor: theme.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
     overflow: 'hidden',
   },
-  className: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333333',
-    flex: 1,
-  },
-  reservedBadge: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#208AEF',
-  },
-  projectName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#333333',
-    marginBottom: 4,
-  },
-  description: {
-    fontSize: 13,
-    color: '#666666',
-    marginBottom: 8,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  timeText: {
-    fontSize: 12,
-    color: '#888888',
-  },
-  capacityText: {
-    fontSize: 12,
-    color: '#888888',
-  },
-  emptyContainer: {
-    paddingTop: 60,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999999',
-  },
-  sectionHeader: {
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    marginTop: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: '#208AEF',
-  },
-  sectionHeaderText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#208AEF',
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  modalContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    margin: 24,
-    maxHeight: '85%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333333',
-  },
-  modalClose: {
-    fontSize: 20,
-    color: '#666666',
-  },
-  modalBody: {
-    padding: 16,
-  },
-  modalBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  modalClassName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333333',
-  },
-  modalProjectName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333333',
-    marginBottom: 8,
-  },
-  modalDescription: {
-    fontSize: 15,
-    color: '#666666',
-    lineHeight: 22,
-  },
-  modalDivider: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginVertical: 12,
-  },
-  modalSectionLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 10,
-  },
-  slotRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#f8f8f8',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  slotRowReserved: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#208AEF',
-    backgroundColor: '#f0f6ff',
-  },
-  slotInfo: {
-    flex: 1,
-  },
-  slotTime: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#333333',
-    marginBottom: 2,
-  },
-  slotAvailability: {
-    fontSize: 13,
-    color: '#666666',
-    marginBottom: 6,
-  },
-  slotReservedText: {
-    color: '#208AEF',
-    fontWeight: '600',
-  },
-  slotFull: {
-    color: '#e74c3c',
-    fontWeight: '600',
-  },
-  peopleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  peopleLabel: {
-    fontSize: 13,
-    color: '#666666',
-    marginRight: 4,
-  },
-  peopleButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 6,
-    backgroundColor: '#ffffff',
-  },
-  peopleButtonActive: {
-    backgroundColor: '#208AEF',
-    borderColor: '#208AEF',
-  },
-  peopleButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333333',
-  },
-  peopleButtonTextActive: {
-    color: '#ffffff',
-  },
-  slotReserveButton: {
-    backgroundColor: '#208AEF',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginLeft: 12,
-  },
-  slotReserveButtonText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  slotCancelButton: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#e74c3c',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-  },
+  kind: { fontSize: 12, color: theme.muted },
+  favBadge: { fontSize: 14, fontWeight: 'bold', color: theme.primaryDark, marginLeft: 'auto' },
+  projectName: { fontSize: 15, fontWeight: '600', color: theme.text, marginBottom: 4 },
+  description: { fontSize: 13, color: '#666666', marginBottom: 8 },
+  ticket: { fontSize: 12, color: theme.muted },
+  emptyContainer: { paddingTop: 60, alignItems: 'center' },
+  emptyText: { fontSize: 16, color: '#999999' },
 });

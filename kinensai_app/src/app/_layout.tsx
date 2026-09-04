@@ -1,10 +1,8 @@
 import { Tabs } from "expo-router";
-import { Image } from "react-native";
-import { ReservationProvider } from "../context/ReservationContext";
+import { Image, Text } from "react-native";
 
 export default function RootLayout() {
   return (
-    <ReservationProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -20,11 +18,8 @@ export default function RootLayout() {
       }}
       initialRouteName="index"
     >
-      {/* 
-        共通コンポーネント(components/Header)がタブとして認識されて
-        表示されてしまっていたので、非表示にします。これで「豆腐」が消えます。
-      */}
-      <Tabs.Screen name="components/Header" options={{ href: null }} />
+      {/* 通知画面はタブに表示せず、Headerのベルから遷移する */}
+      <Tabs.Screen name="notifications" options={{ href: null }} />
 
       <Tabs.Screen
         name="camera"
@@ -91,22 +86,13 @@ export default function RootLayout() {
         }}
       />
       <Tabs.Screen
-        name="reservation"
+        name="map"
         options={{
           tabBarIcon: ({ focused }) => (
-            <Image
-              source={require('../../icon/Reservation.png')}
-              style={{
-                width: 40,
-                height: 40,
-                opacity: focused ? 1 : 0.5,
-              }}
-              resizeMode="contain"
-            />
+            <Text style={{ fontSize: 32, opacity: focused ? 1 : 0.5 }}>🗺️</Text>
           ),
         }}
       />
     </Tabs>
-    </ReservationProvider>
   );
 }

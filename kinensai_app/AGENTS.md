@@ -1,54 +1,32 @@
 # Agents: kinensai_app
 
 ## Expo SDK 56
-Read versioned docs at https://docs.expo.dev/versions/v56.0.0/ before writing code. This project uses Expo ~56.0.x, React Native 0.85.3, React 19.2.3, TypeScript ~6.0.3, expo-router ~56.2.11, and Expo SDK 56 conventions.
+Read versioned docs at https://docs.expo.dev/versions/v56.0.0/ before writing code. Expo ~56.0.x, React Native 0.85.3, React 19.2.3, TypeScript ~6.0.3, expo-router ~56.2.x.
 
 ## Project structure
-- **Root** (`../`) has a redundant `package.json` — run all commands inside `kinensai_app/`.
-- **App entry**: `src/app/_layout.tsx` (expo-router file-based routing). Entrypoint defined in `package.json` as `expo-router/entry`.
-- **5 bottom tabs** (in order): camera → timetable → index (home) → search → reservation.
-- **`components/Header`** sits in `src/app/components/` but is excluded from tab navigation via `href: null`.
-- **ReservationContext** wraps all routes — provides `exhibitions`, `reservations`, `reserve`, `cancel`, `isReserved`, `effectiveReserved`, `isLoading`.
-- **Path aliases**: `@/*` → `./src/*`, `@/assets/*` → `./assets/*` (defined in `tsconfig.json`).
-- **Tab bar icons** live in `icon/` (project root, not `assets/`), referenced as `require('../../icon/...')`.
-- **Exhibition IDs** use Japanese day prefix: `"土曜日_1A"`, `"日曜日_1C"`.
-- **Non-route code** (`context/`, `utils/`, `data/`) lives at `src/` level, not under `src/app/`, to avoid route registration warnings.
+- Run all commands inside `kinensai_app/` (repo-root `package.json` is stale, do not use).
+- Entry: `src/app/_layout.tsx` (expo-router). 5 tabs in order: camera → timetable → index (home) → search → map. `notifications` is a hidden route (`href: null`), opened from the Header bell.
+- Shared `Header` lives in `src/components/` (never under `src/app/`, which would register it as a route). Non-route code lives in `src/data/`, `src/theme.ts` (never under `src/app/`).
+- Path alias `@/*` → `src/*`. Tab icons in `icon/` via `require('../../icon/...')`. Map tab icon is a temporary `none.png`.
+- No reservation feature: `reservation.tsx`, `ReservationContext`, `reservation/`, `csvLoader`, old `types.ts` were deleted per spec. Do not reintroduce.
 - `CLAUDE.md` is a single-line `@AGENTS.md` alias.
 
-## Data files
-- Metro config adds `.csv` and `.txt` to `assetExts` (`metro.config.js`).
-- **Planning data** per class: `planning/{class}/title.txt` (display name), `planning/{class}/detail.txt` (description) — loaded via `src/data/classContent.ts` using `Asset.fromModule()` + `expo-file-system/legacy`.
-- **Reservation CSVs** per class × day: `reservation/{class}/{day}.csv`. 3-row CSV: row1=paired time values (always even count), row2=capacity (single value shared by all slots), row3=per-slot reserved counts.
-- **Timetable CSV** (`time/Auditorium.csv`) — 4-column CSV: team, day [0/1], start, end (parser also handles 5-column: ID, team, day, start, end).
-- **CSV persistence**: `reservation/{class}/{day}.csv` is copied from the bundle to `FileSystem.documentDirectory/reservation/{class}/{day}.csv` on first load. Every `reserve`/`cancel` call rewrites the live CSV in the document directory (source of truth for counts). Bundled CSVs are read-only seeds.
-- **`reservations.json`** (`FileSystem.documentDirectory/reservations.json`): tracks only the current device/user's personal reservation records — used for the reservation list, cancellation, and duplicate detection. Not used for count persistence.
+## Data layer
+- `metro.config.js` keeps `.csv,.txt` in `assetExts`. File IO uses `expo-file-system/legacy` + `Asset.fromModule()`.
+- `src/data/classContent.ts` loads `planning/{組}/title.txt, detail.txt` (currently 1A/1B/1C only; extend `CLASS_NAMES` + asset maps together).
+- `src/data/exhibitions.ts` wraps class content into reservation-free `Exhibition` (ticket fields default `unknown`/null until data arrives).
+- `src/data/favorites.ts` persists favorite IDs to `FileSystem.documentDirectory/favorites.json`.
+- `src/data/timetable.ts` parses `time/Auditorium.csv` (4-col `team,day,start,end`, `day: 0=土,1=日`; 5-col also accepted). `delayMinutes` defaults to 0 — realtime delay feed goes here.
+- `src/data/festival.ts` holds home copy excerpted from `HP/` (dates, access, notes, Passione theme). Canonical spec is repo-root `仕様書.md`.
+- Map images in repo-root `校内マップ/` are outside the Metro bundle; place used images under `assets/maps/` before wiring into `src/app/map.tsx`.
 
-## Per-slot reservation system
-- Each `TimeSlot` carries its own `capacity` and `reservedCount` (from CSV row 2/3).
-- `Exhibition` has no top-level `capacity`/`reservedCount` — use `timeSlots[i].capacity` etc.
-- `ReservationRecord` has `slotIndex` and `peopleCount` (1-5) — one record per reserved time slot per exhibition.
-- **Effective count** = CSV `reservedCount` from live document-directory file (source of truth). Merged at init: bundle CSV counts + sum of `peopleCount` from `reservations.json` → written to doc-dir CSV. Thereafter, every reserve/cancel rewrites the doc-dir CSV directly.
-- Context API: `reserve(exhibition, slotIndex, peopleCount)`, `cancel(exhibitionId, slotIndex)`, `isReserved(exhibitionId, slotIndex)`, `effectiveReserved(exhibition, slotIndex)`.
+## Theme
+- `src/theme.ts`: white `#ffffff` bg, orange `#FF6B00` primary, ink `#1A1A1A`. Screens use `SafeAreaView` + `Header`. Do not use blue `#208AEF`.
 
-## Commands
+## Commands / verification
 ```
-npm run start        # expo dev server
-npm run android      # dev on Android
-npm run ios          # dev on iOS
-npm run web          # dev on web
-npm run lint         # expo lint (ESLint)
+npm run start / android / ios / web
+npm run lint
+powershell -ExecutionPolicy Bypass -Command "node_modules\.bin\eslint src\ --quiet; node_modules\.bin\tsc --noEmit"
 ```
-No test runner or typecheck script is configured (no `tsc` in scripts).
-
-## Verification
-```
-node_modules\.bin\eslint src\ --quiet
-node_modules\.bin\tsc --noEmit   (ignore example/ errors — they are from the expo template)
-```
-
-## Conventions & gotchas
-- **Legacy import**: CSV/JSON file IO uses `expo-file-system/legacy` (not the new `expo-file-system` API).
-- **TypeScript strict** mode enabled.
-- **`experiments.typedRoutes`** and **`experiments.reactCompiler`** are enabled in `app.json`.
-- **VS Code**: Uses `expo.vscode-expo-tools` extension. Code Actions on Save: `source.fixAll`, `source.organizeImports`, `source.sortMembers`.
-- `expo-env.d.ts` is generated by `expo-cli` and gitignored.
+No test runner. `.expo/types/router.d.ts` regenerates on `expo start` (camera.tsx uses `as never` cast for `/map` until then).
