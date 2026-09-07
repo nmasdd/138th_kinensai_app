@@ -1,5 +1,6 @@
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Platform } from 'react-native';
 
 export interface StageItem {
   id: string;
@@ -44,11 +45,28 @@ function parseCsv(csv: string): StageItem[] {
 }
 
 export async function loadAuditorium(): Promise<StageItem[]> {
-  const asset = Asset.fromModule(require('../../time/Auditorium.csv'));
-  await asset.downloadAsync();
-  if (!asset.localUri) return [];
-  const text = await FileSystem.readAsStringAsync(asset.localUri);
-  return parseCsv(text);
+  try {
+    const asset = Asset.fromModule(require('../../time/Auditorium.csv'));
+    await asset.downloadAsync();
+    const uri = asset.localUri ?? (asset as { uri?: string }).uri;
+    if (!uri) return [];
+    let text: string;
+    // Web: asset URI は相対パスのため fetch で読む (同一オリジン解決)。
+    if (Platform.OS === 'web') {
+      const res = await fetch(uri);
+      if (!res.ok) return [];
+      text = await res.text();
+    } else if (uri.startsWith('http://') || uri.startsWith('https://')) {
+      const res = await fetch(uri);
+      if (!res.ok) return [];
+      text = await res.text();
+    } else {
+      text = await FileSystem.readAsStringAsync(uri);
+    }
+    return parseCsv(text);
+  } catch {
+    return [];
+  }
 }
 
 function toMinutes(t: string): number {
