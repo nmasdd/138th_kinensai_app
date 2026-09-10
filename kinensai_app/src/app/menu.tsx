@@ -1,8 +1,9 @@
 import React from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { M3Icon, M3ListItem, M3Touch, type IconName } from '../components/m3';
+import { M3FAB, M3ListItem, TopAppBar, goBackOrHome, type IconName } from '../components/m3';
+import { Stagger } from '../components/anim';
 import { m3 } from '../theme';
 import type { ListPosition } from '../components/m3';
 
@@ -26,24 +27,26 @@ const ENTRIES: Entry[] = [
 ];
 
 export default function MenuScreen() {
+  const insets = useSafeAreaInsets();
   const go = (href: Entry['href']) => {
     router.replace(href as never);
   };
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.body}>
+      <TopAppBar title="メニュー" />
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         {ENTRIES.map((e, i) => {
           const position: ListPosition =
             ENTRIES.length === 1 ? 'single' : i === 0 ? 'top' : i === ENTRIES.length - 1 ? 'bottom' : 'middle';
-          return <M3ListItem key={e.title} icon={e.icon} title={e.title} sub={e.sub} position={position} onPress={() => go(e.href)} />;
+          return (
+            <Stagger key={e.title} index={i}>
+              <M3ListItem icon={e.icon} title={e.title} sub={e.sub} position={position} onPress={() => go(e.href)} />
+            </Stagger>
+          );
         })}
       </ScrollView>
-      <View style={styles.closeWrap}>
-        <M3Touch onPress={() => router.back()} label="メニューを閉じる" round>
-          <View style={styles.closeButton}>
-            <M3Icon name="close" color={m3.onPrimary} />
-          </View>
-        </M3Touch>
+      <View style={[styles.closeWrap, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <M3FAB icon="close" label="メニューを閉じる" onPress={() => goBackOrHome()} />
       </View>
     </SafeAreaView>
   );
@@ -51,16 +54,6 @@ export default function MenuScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: m3.surface },
-  body: { flexGrow: 1, justifyContent: 'center', padding: 16, paddingBottom: 8 },
+  body: { flexGrow: 1, justifyContent: 'center', padding: 16, paddingBottom: 16 },
   closeWrap: { alignItems: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
-  closeButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 999,
-    backgroundColor: m3.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-    boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-  },
 });

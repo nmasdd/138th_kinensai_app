@@ -16,6 +16,14 @@ export default function RootLayout() {
       />
       <Stack.Screen name="vote" options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="pamphlet" options={{ animation: 'slide_from_right' }} />
+      {/* 管理者用 (/admin 直接アクセス専用。タブ・メニューに入口なし) */}
+      <Stack.Screen name="admin/index" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="admin/class" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="admin/volunteer" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="admin/notifications" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="admin/stage" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="admin/picks" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="admin/data" options={{ animation: 'slide_from_right' }} />
     </Stack>
   );
 }

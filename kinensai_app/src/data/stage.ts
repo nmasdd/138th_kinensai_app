@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
+import { loadJSON, saveJSON } from './kvStore';
 
 export interface StageGroup {
   id: string;
   name: string;
   detail: string;
+  /** 管理者ページで登録した画像 (file:// URI または dataURL)。なければ null */
+  imageUri?: string | null;
 }
 
 /**
@@ -17,18 +21,17 @@ const bundledGroups: StageGroup[] = [
 ];
 
 const VOTES_FILE = `${FileSystem.documentDirectory}stage-votes.json`;
-const GROUPS_FILE = `${FileSystem.documentDirectory}stage-groups.json`;
+const GROUPS_KEY = 'stage-groups.json';
 
 async function loadGroups(): Promise<StageGroup[]> {
-  try {
-    if (!FileSystem.documentDirectory) return bundledGroups;
-    const info = await FileSystem.getInfoAsync(GROUPS_FILE);
-    if (!info.exists) return bundledGroups;
-    const raw = await FileSystem.readAsStringAsync(GROUPS_FILE);
-    const parsed: unknown = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed as StageGroup[];
-  } catch {}
+  const parsed = await loadJSON<unknown>(GROUPS_KEY, null);
+  if (Array.isArray(parsed)) return parsed as StageGroup[];
   return bundledGroups;
+}
+
+/** 管理者ページから出演団体一覧を保存する */
+export async function saveStageGroups(groups: StageGroup[]): Promise<void> {
+  await saveJSON(GROUPS_KEY, groups);
 }
 
 export function useStageGroups() {
@@ -36,9 +39,11 @@ export function useStageGroups() {
   const [votedId, setVotedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  // 管理者ページの保存を即反映するため、表示のたびに再読込する
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
       const [loadedGroups, savedVote] = await Promise.all([
         loadGroups(),
         (async () => {
@@ -62,7 +67,8 @@ export function useStageGroups() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    }, []),
+  );
 
   const vote = useCallback((id: string) => {
     setVotedId(id);

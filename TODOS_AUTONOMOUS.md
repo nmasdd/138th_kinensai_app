@@ -1,0 +1,228 @@
+# 自律改善 Todo 210件 — 優先度・影響度・依存関係付き
+
+凡例: [P:H/M/L] 優先度 / [I:大/中/小] 影響度 / [D:依存先ID]
+2タップ原則: 全ページは最大2タップで到達 (管理者除く)。M3準拠: theme.ts/m3.tsxのみ参照。
+
+## A. マップ Googleマップ化 (最優先, 30件)
+- [x] A01 [P:H][I:大] 画像直接表示の排除 (Image/require f1-f45削除) D:なし
+- [x] A02 [P:H][I:大] vectorMap.ts フロア幾何データ作成 (1F/2F/3F/4-5F/模擬店) D:A01
+- [x] A03 [P:H][I:大] VectorMapView コンポーネント (pan/pinch/wheel/double-tap zoom) D:A02
+- [x] A04 [P:H][I:大] ズームボタン +/-/リセット/現在地 (QR loc) D:A03
+- [x] A05 [P:H][I:大] マーカー選択・点滅・詳細ボックス連携維持 D:A03
+- [x] A06 [P:H][I:大] フロア切替でベクター再描画・模擬店は屋台アイコン配置 D:A02
+- [x] A07 [P:H][I:中] スケールバー・階ラベル・方位表示 D:A03
+- [x] A08 [P:H][I:中] mapHotspots.ts のx/yをベクター座標に再マップ D:A02
+- [x] A09 [P:H][I:中] QR loc→ベクター上でハイライト+自動パン D:A03
+- [x] A10 [P:H][I:中] アクセシビリティ (role/ラベル/44dpタップ) D:A03
+- [x] A11 [P:M][I:中] assets/maps参照の完全除去確認 D:A01
+- [x] A12 [P:M][I:中] Web wheel-zoom / native pinch 両対応 D:A03
+- [x] A13 [P:M][I:小] 部屋ラベル2-3文字短縮の維持 D:A02
+- [x] A14 [P:M][I:小] 廊下・階段・トイレ・EVの図示 D:A02
+- [x] A15 [P:M][I:小] 混雑色分けの下地 (congestion.json連携口) D:A02
+- [x] A16 [P:H][I:大] map.tsx のImage/Asset/expo-asset import削除 D:A01
+- [x] A17 [P:H][I:中] 検索バー下部固定のままベクターが隠れないpadding D:A03
+- [x] A18 [P:M][I:中] 選択行タップ→ベクターへスクロール+点滅 D:A05
+- [x] A19 [P:M][I:中] 同居企画(sharedIds)リンク維持 D:A05
+- [x] A20 [P:M][I:小] 空状態文言統一 (模擬店準備中/一致なし) D:なし
+- [x] A21 [P:L][I:小] マップ凡例 (教室/特別教室/屋外) D:A02
+- [x] A22 [P:L][I:小] コンパス/北矢印 D:A03
+- [x] A23 [P:L][I:小] ダーク時も見える配色 (固定ライト内) D:A02
+- [x] A24 [P:M][I:中] パフォーマンス (memo/不要再描画排除) D:A03
+- [x] A25 [P:M][I:中] 390px幅ではみ出さない (maxWidth 100%) D:A03
+- [x] A26 [P:M][I:小] 縮尺1x-4x制限・バウンド D:A03
+- [x] A27 [P:L][I:小] アニメーション縮小設定の尊重 D:A03
+- [x] A28 [P:M][I:中] E2E: 画像未使用・ズーム・パン・マーカーの検証 D:A03
+- [x] A29 [P:M][I:小] 仕様書§7のベクター記述へ更新 D:A01
+- [x] A30 [P:L][I:小] 旧jpgアセットの扱い文書化 D:A11
+
+## B. M3準拠・一貫性 (40件)
+- [x] B01 [P:H][I:大] app.json splash #208AEF→#D14E00 D:なし
+- [x] B02 [P:H][I:大] 残存#208AEF全検索・置換 D:B01
+- [x] B03 [P:H][I:大] 色直書きの排除 (rgba影/ripple除く) D:なし
+- [x] B04 [P:H][I:中] fontSize直書き排除→m3type D:なし
+- [x] B05 [P:H][I:中] borderRadius直書き→m3shape D:なし
+- [x] B06 [P:H][I:中] 画像高さ統一140 (search140/vote160/notif160/modal160→140) D:なし
+- [x] B07 [P:H][I:中] カードvariant統一 (一覧=filled, 強調=elevated, 情報=outlined) D:なし
+- [x] B08 [P:H][I:中] M3LoadingView統一 (timetable/notif/index/camera) D:なし
+- [x] B09 [P:H][I:中] M3EmptyState統一 (camera許可/empty系) D:なし
+- [x] B10 [P:H][I:中] M3Headline統一 D:なし
+- [x] B11 [P:M][I:中] M3Dialog化 (ExhibitionDetailModal: ScrollView+Icon close+44dp) D:なし
+- [x] B12 [P:M][I:中] overlay rgba(0,0,0,0.4)→M3 scrim定数 D:B11
+- [x] B13 [P:M][I:中] ✕テキスト→M3Icon close D:B11
+- [x] B14 [P:M][I:中] menu close→M3FAB化 D:なし
+- [x] B15 [P:M][I:中] chip自作→M3 FilterChip化 (search) D:なし
+- [x] B16 [P:M][I:中] TimeBox→M3Card化 D:なし
+- [x] B17 [P:M][I:中] 開催中バッジ→M3Badge化 D:なし
+- [x] B18 [P:M][I:小] M3Divider導入 (pick/TimeBox/modal) D:なし
+- [x] B19 [P:M][I:小] pickBadge自作→M3 chip D:なし
+- [x] B20 [P:M][I:小] nowLine→Divider variant D:なし
+- [x] B21 [P:M][I:小] FAB label可視化 (extended FAB) D:なし
+- [x] B22 [P:M][I:小] nested pressable解消 (vote card+heart) D:なし
+- [x] B23 [P:M][I:小] 投票選択→Badge/Chip表示 D:なし
+- [x] B24 [P:M][I:小] 戻るボタン→AppBar up + 右下文言統一 D:なし
+- [x] B25 [P:M][I:小] 日付表示スロット統一 D:なし
+- [x] B26 [P:L][I:小] hero→M3Card化検討 (現状維持+角丸統一) D:なし
+- [x] B27 [P:L][I:小] padding/gap数値のm3layout参照化 D:なし
+- [x] B28 [P:L][I:小] fontWeight 700→500化 D:なし
+- [x] B29 [P:L][I:小] 未使用tertiaryContainerの用途記録 D:なし
+- [x] B30 [P:M][I:中] TopAppBar全画面統一 (loading分岐でも表示) D:B08
+- [x] B31 [P:M][I:小] screenPadding 16/sectionGap/gap12統一 D:なし
+- [x] B32 [P:L][I:小] iconはMaterialIconsのみ確認 D:なし
+- [x] B33 [P:L][I:小] M3Touch ripple/scale統一 D:なし
+- [x] B34 [P:L][I:小] FAB位置 (端16dp) 統一 D:なし
+- [x] B35 [P:L][I:小] tab indicator 3px/48px統一 D:なし
+- [x] B36 [P:L][I:小] listItem連結形状統一 D:なし
+- [x] B37 [P:L][I:小] emptyIcon 80円統一 D:なし
+- [x] B38 [P:M][I:中] modal maxHeight85%+ScrollViewで説明クリップ解消 D:B11
+- [x] B39 [P:M][I:小] pamphlet仮文言→準備中文言 D:なし
+- [x] B40 [P:L][I:小] デザインルール§5数値の再確認 D:なし
+
+## C. 2タップ到達・ナビ (25件)
+- [x] C01 [P:H][I:大] ホームに全ページQuickNav (map/search/timetable/camera/vote/pamphlet/notifications) D:なし
+- [x] C02 [P:H][I:大] QuickNavコンポーネント化 D:C01
+- [x] C03 [P:H][I:大] menu 9項目の維持・push/replace整理 D:なし
+- [x] C04 [P:H][I:中] search?filter=mogiten導線維持 D:なし
+- [x] C05 [P:H][I:中] search?exhibit=深リンク維持 D:なし
+- [x] C06 [P:H][I:中] /map?loc=QR導線維持 D:A09
+- [x] C07 [P:H][I:中] vote/pamphletからホームへ1タップ復帰 D:なし
+- [x] C08 [P:M][I:中] notifications→[id]→戻るの3タップを2タップ化 (AppBar up) D:B24
+- [x] C09 [P:M][I:中] タブ5順序固定確認 D:なし
+- [x] C10 [P:M][I:中] 中央home初期ルート確認 D:なし
+- [x] C11 [P:M][I:小] menu→各画面の到達テスト D:C03
+- [x] C12 [P:M][I:小] ホーム→各画面の到達テスト D:C01
+- [x] C13 [P:M][I:小] TopAppBar menu/bellの全画面配置 D:なし
+- [x] C14 [P:L][I:小] 存在しない予約導線がないこと D:なし
+- [x] C15 [P:M][I:小] 同居企画リンクで1タップ切替 D:A19
+- [x] C16 [P:L][I:小] 詳細モーダル→お気に入り→検索絞込の導線 D:なし
+- [x] C17 [P:L][I:小] timetable→vote導線 D:なし
+- [x] C18 [P:L][I:小] camera→map導線 D:C06
+- [x] C19 [P:L][I:小] notif bell→一覧→詳細 D:C08
+- [x] C20 [P:L][I:小] pamphlet→home導線 D:C07
+- [x] C21 [P:L][I:小] 404/空id時のフォールバック D:なし
+- [x] C22 [P:M][I:中] ディープリンク型安全 (typedRoutes) D:なし
+- [x] C23 [P:L][I:小] admin除外確認 (2タップ制約外) D:なし
+- [x] C24 [P:L][I:小] router.back破壊の確認 (menu replace影響) D:C03
+- [x] C25 [P:L][I:小] E2E到達行列の自動検証 D:C11
+
+## D. スマホUX・レスポンシブ・a11y (45件)
+- [x] D01 [P:H][I:大] 390px幅ではみ出し検査 (全タブ+通知+投票+menu) D:なし
+- [x] D02 [P:H][I:大] タップ領域44dp以上 (modal close含む) D:B11
+- [x] D03 [P:H][I:中] 見出し階層 header role D:なし
+- [x] D04 [P:H][I:中] ライブリージョン (件数/開催中/スキャン結果) D:なし
+- [x] D05 [P:H][I:中] selected/expanded state付与 (chip/tab/投票/お気に入り) D:なし
+- [x] D06 [P:M][I:中] コントラスト (primary #D14E00維持, 淡色文字の排除) D:なし
+- [x] D07 [P:M][I:中] フォントスケール時の省略 numberOfLines維持 D:なし
+- [x] D08 [P:M][I:中] ScrollView下余白96 (FAB/固定検索) D:なし
+- [x] D09 [P:M][I:中] キーボード時の検索バー被り対応 D:なし
+- [x] D10 [P:M][I:中] カメラ権限フロー文言・ボタン D:なし
+- [x] D11 [P:M][I:中] スキャン結果コピー/全文表示 D:なし
+- [x] D12 [P:M][I:中] 触覚/音声キュー代替 (視覚フラッシュ) D:なし
+- [x] D13 [P:M][I:小] 画像placeholder統一 D:B06
+- [x] D14 [P:M][I:小] ローディングのTopAppBar維持 D:B30
+- [x] D15-D45 (省略せず列挙):
+- [x] D15 [P:M][I:小] SafeArea top+bottom対応 D:なし
+- [x] D16 [P:M][I:小] 横並びボタンのflex:1/minWidth:0 D:なし
+- [x] D17 [P:M][I:小] quickRow 2列→4列QuickNav拡張 D:C01
+- [x] D18 [P:M][I:小] picks区切り線Divider化 D:B18
+- [x] D19 [P:M][I:小] pick star装飾のhidden化 D:なし
+- [x] D20 [P:M][I:小] resultInfo件数のliveRegion D:D04
+- [x] D21 [P:M][I:小] FlatList empty/loadedのa11y D:なし
+- [x] D22 [P:M][I:小] TimeRow selected state D:D05
+- [x] D23 [P:M][I:小] 混雑+now文の分割表示 D:なし
+- [x] D24 [P:M][I:小] CameraView label D:なし
+- [x] D25 [P:M][I:小] frameのAT非表示 D:なし
+- [x] D26 [P:M][I:小] menu見出し/list意味付け D:なし
+- [x] D27 [P:M][I:小] menu focus trap代替 (戻る明示) D:なし
+- [x] D28 [P:M][I:小] vote nested解消 D:B22
+- [x] D29 [P:M][I:小] vote selected state D:D05
+- [x] D30 [P:M][I:小] vote戻る文言具体化 D:B24
+- [x] D31 [P:M][I:小] pamphlet仮文言 D:B39
+- [x] D32 [P:M][I:小] pamphletホーム文言具体化 D:B24
+- [x] D33 [P:M][I:小] notif card hint「詳細を開く」 D:なし
+- [x] D34 [P:M][I:小] notif本文2行+全文導線 D:なし
+- [x] D35 [P:M][I:小] modal focus trap代替 D:B11
+- [x] D36 [P:M][I:小] modal reduced-motion対応 D:なし
+- [x] D37 [P:M][I:小] お気に入りselected state D:D05
+- [x] D38 [P:L][I:小] ticket/place見出し化 D:なし
+- [x] D39 [P:L][I:小] M3TextButton化検討 D:なし
+- [x] D40 [P:L][I:小] プルリフレッシュ (通知/検索) D:なし
+- [x] D41 [P:L][I:小] スクロールインジケータ非表示統一 D:なし
+- [x] D42 [P:L][I:小] iOS/Android/Web差異ガード (Toast/Camera/FS) D:なし
+- [x] D43 [P:L][I:小] フォント Reboto依存の明記 D:なし
+- [x] D44 [P:L][I:小] 画面回転portrait固定確認 D:なし
+- [x] D45 [P:L][I:小] 拡大文字でのレイアウト崩れ目視 D:D01
+
+## E. バグ修正・リファクタ・パフォ (30件)
+- [x] E01 [P:H][I:大] tsc --noEmit 0エラー D:なし
+- [x] E02 [P:H][I:大] eslint --quiet 0警告 D:なし
+- [x] E03 [P:H][I:中] 未使用import/変数除去 D:E01
+- [x] E04 [P:H][I:中] expo lint通過 D:E02
+- [x] E05 [P:M][I:中] useMemo/useCallback最適化 (map/search) D:なし
+- [x] E06 [P:M][I:中] FlatList windowSize/key最適化 D:なし
+- [x] E07 [P:M][I:中] 画像アセット参照除去後のmetro assetExts維持 (csv/txt) D:A11
+- [x] E08 [P:M][I:中] Web fetch分岐維持 (classContent/timetable) D:なし
+- [x] E09 [P:M][I:中] documentDirectory falsyガード維持 D:なし
+- [x] E10 [P:M][I:中] ファイル頂部パス組立の維持 D:なし
+- [x] E11 [P:M][I:小] console.error/log残存除去 D:なし
+- [x] E12 [P:M][I:小] as never暫定の整理 (typedRoutes再生成後) D:なし
+- [x] E13 [P:M][I:小] blinkAnimリーク停止 D:なし
+- [x] E14 [P:M][I:小] cancelledガード維持 D:なし
+- [x] E15 [P:L][I:小] コメント更新 (画像→ベクター) D:A29
+- [x] E16 [P:L][I:小] 重複ロジック共通化 (isMogiten等) D:なし
+- [x] E17 [P:L][I:小] マジックナンバー定数化 D:なし
+- [x] E18 [P:L][I:小] 型export整理 D:なし
+- [x] E19 [P:L][I:小] adminUi重複整理 D:なし
+- [x] E20 [P:L][I:小] kvStoreエラーハンドリング D:なし
+- [x] E21 [P:M][I:中] 予約関連の残存確認 (Context/CSV/JSONなし) D:C14
+- [x] E22 [P:M][I:小] .playwright-mcp/androidコミット除外確認 D:なし
+- [x] E23 [P:M][I:小] expo-env.d.ts生成物扱い D:なし
+- [x] E24 [P:L][I:小] README手順更新 D:なし
+- [x] E25 [P:L][I:小] 仕様書追記 (ベクター/QuickNav/2タップ行列) D:A29
+- [x] E26 [P:M][I:中] パフォーマンス: ベクター部屋数上限・memo D:A24
+- [x] E27 [P:M][I:小] 不要再レンダー排除 (tabs/markers) D:A24
+- [x] E28 [P:L][I:小] バンドルサイズ (画像参照削除で減) D:A11
+- [x] E29 [P:L][I:小] 起動時間目視 D:なし
+- [x] E30 [P:L][I:小] クラッシュガード (空データ時) D:なし
+
+## F. E2Eテスト (40件)
+- [x] F01 [P:H][I:大] e2eランナー作成 (node断言100+) D:なし
+- [x] F02 [P:H][I:大] 地図: Image/require/assets-maps不在検証 D:A11
+- [x] F03 [P:H][I:大] 地図: VectorMapView存在・pan/zoom/reset/現在地検証 D:A03
+- [x] F04 [P:H][I:大] 地図: 全フロア部屋定義検証 D:A02
+- [x] F05 [P:H][I:大] M3: #208AEF不在・m3参照検証 D:B02
+- [x] F06 [P:H][I:大] 2タップ行列検証 (全9画面) D:C25
+- [x] F07 [P:H][I:中] tsc検証 D:E01
+- [x] F08 [P:H][I:中] eslint検証 D:E02
+- [x] F09 [P:H][I:中] タブ順序・初期ルート検証 D:C09
+- [x] F10 [P:H][I:中] 文言フォールバック検証 D:なし
+- [x] F11 [P:M][I:中] 検索絞込 (mogiten/お気に入り) 検証 D:なし
+- [x] F12 [P:M][I:中] QR loc導線検証 D:C06
+- [x] F13 [P:M][I:中] 投票フロー検証 D:なし
+- [x] F14 [P:M][I:中] 通知一覧→詳細検証 D:C08
+- [x] F15 [P:M][I:中] カメラ権限分岐検証 D:なし
+- [x] F16 [P:M][I:中] a11y (label/role/state) 検証 D:D05
+- [x] F17 [P:M][I:中] 390pxはみ出し (flex/minWidth) 検証 D:D01
+- [x] F18 [P:M][I:中] カードvariant・画像高さ統一検証 D:B06
+- [x] F19 [P:M][I:中] TopAppBar全画面検証 D:B30
+- [x] F20 [P:M][I:中] modal ScrollView+44dp検証 D:B38
+- [x] F21-F40: 予備テスト枠 (失敗時の追加回帰・Playwright目視の自動化):
+- [x] F21 [P:M][I:中] Playwright: / 全タブ巡回 D:なし
+- [x] F22 [P:M][I:中] Playwright: 件数・絞込・はみ出し D:なし
+- [x] F23 [P:M][I:中] Playwright: コンソールエラー0 D:なし
+- [x] F24 [P:M][I:中] Playwright: 地図ズーム操作 D:A03
+- [x] F25 [P:M][I:中] Playwright: マーカータップ→詳細 D:A05
+- [x] F26 [P:M][I:小] 予約残存なし D:E21
+- [x] F27 [P:M][I:小] assetExts csv/txt維持 D:E07
+- [x] F28 [P:M][I:小] Web分岐維持 D:E08
+- [x] F29 [P:L][I:小] 仕様書追記の存在 D:E25
+- [x] F30 [P:L][I:小] TODOS 200件の存在 D:なし
+- [x] F31 [P:L][I:小] QuickNavの存在 D:C01
+- [x] F32 [P:L][I:小] M3Badge/Divider/Chipの存在 D:B15
+- [x] F33 [P:L][I:小] スプラッシュ色修正 D:B01
+- [x] F34 [P:L][I:小] modal reduced-motion D:D36
+- [x] F35 [P:L][I:小] SafeArea対応 D:D15
+- [x] F36 [P:L][I:小] 404フォールバック D:C21
+- [x] F37 [P:L][I:小] バンドル画像削減 D:E28
+- [x] F38 [P:L][I:小] コメント更新 D:E15
+- [x] F39 [P:L][I:小] 再実行で全緑 D:なし
+- [x] F40 [P:L][I:小] 残課題の文書化 D:なし

@@ -1,0 +1,31 @@
+import { loadJSON, saveJSON } from './kvStore';
+
+/**
+ * ホームの「おすすめ企画」で表示する企画ID列。
+ * 管理者ページで選択し、`picks.json` (`{ids: string[]}`) に永続化する。
+ * 未設定 (空配列) のときはホーム側でカタログ先頭2件をフォールバック表示する。
+ * 順序は選択順 (配列順) をそのまま使う。
+ */
+
+const PICKS_KEY = 'picks.json';
+
+export interface PicksData {
+  ids: string[];
+}
+
+function isPicksData(value: unknown): value is PicksData {
+  return !!value && typeof value === 'object' && Array.isArray((value as PicksData).ids);
+}
+
+/** 保存済みの企画ID列を読む。未設定・破損時は空配列を返す。 */
+export async function loadPickIds(): Promise<string[]> {
+  const parsed = await loadJSON<unknown>(PICKS_KEY, null);
+  if (!isPicksData(parsed)) return [];
+  return parsed.ids.filter((id): id is string => typeof id === 'string');
+}
+
+/** 企画ID列を保存する。 */
+export async function savePickIds(ids: string[]): Promise<void> {
+  const data: PicksData = { ids: [...ids] };
+  await saveJSON(PICKS_KEY, data);
+}

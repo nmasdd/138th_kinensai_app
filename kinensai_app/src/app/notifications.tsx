@@ -1,26 +1,40 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { M3Button, M3Card, M3ImagePlaceholder, TopAppBar } from '../components/m3';
+import React, { useCallback, useState } from 'react';
+import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router, useFocusEffect } from 'expo-router';
+import { M3Button, M3Card, M3EmptyState, M3ImagePlaceholder, M3LoadingView, TopAppBar, goBackOrHome } from '../components/m3';
+import { Stagger } from '../components/anim';
 import { loadNotifications, type AppNotification } from '../data/notifications';
 import { m3, m3type } from '../theme';
 
 export default function NotificationsScreen() {
+  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadNotifications()
-      .catch(() => [])
-      .then(setItems)
-      .finally(() => setIsLoading(false));
-  }, []);
+  // 管理者ページの保存を即反映するため、表示のたびに再読込する
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      loadNotifications()
+        .catch(() => [])
+        .then((list) => {
+          if (!cancelled) setItems(list);
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoading(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.center} edges={['top']}>
-        <ActivityIndicator size="large" color={m3.primary} />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <TopAppBar title="通知" />
+        <M3LoadingView />
       </SafeAreaView>
     );
   }
@@ -32,26 +46,33 @@ export default function NotificationsScreen() {
         data={items}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <M3Card variant="elevated" style={styles.card} onPress={() => router.push(`/notifications/${item.id}`)}>
-            <M3ImagePlaceholder height={120} />
+        renderItem={({ item, index }) => (
+          <Stagger key={item.id} index={index % 10}>
+          <M3Card variant="elevated" style={styles.card} onPress={() => router.push(`/notifications/${item.id}` as never)}>
+            {item.imageUri ? (
+              <Image source={{ uri: item.imageUri }} style={styles.image} resizeMode="cover" />
+            ) : (
+              <M3ImagePlaceholder height={140} />
+            )}
             <View style={styles.cardBody}>
               <Text style={[m3type.labelMedium, { color: m3.onSurfaceVariant }]}>{item.date}</Text>
               <Text style={[m3type.titleMedium, { color: m3.onSurface, marginTop: 2 }]}>{item.title}</Text>
               <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 4 }]} numberOfLines={2}>
                 {item.body}
               </Text>
+              <Text style={[m3type.labelLarge, styles.detailHint]}>詳細を開く</Text>
             </View>
           </M3Card>
+          </Stagger>
         )}
         ListEmptyComponent={
-          <View style={styles.empty}>
+          <M3EmptyState icon="notifications">
             <Text style={[m3type.bodyLarge, { color: m3.onSurfaceVariant }]}>通知はありません</Text>
-          </View>
+          </M3EmptyState>
         }
       />
-      <View style={styles.backWrap}>
-        <M3Button label="戻る" icon="undo" onPress={() => router.back()} />
+      <View style={[styles.backWrap, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <M3Button label="前の画面に戻る" icon="undo" onPress={() => goBackOrHome()} />
       </View>
     </SafeAreaView>
   );
@@ -59,10 +80,10 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: m3.surface },
-  center: { flex: 1, backgroundColor: m3.surface, justifyContent: 'center', alignItems: 'center' },
-  list: { padding: 16, gap: 12 },
+  list: { padding: 16, gap: 16, paddingBottom: 24 },
   card: { padding: 0 },
-  cardBody: { padding: 16 },
-  empty: { paddingTop: 60, alignItems: 'center' },
+  image: { width: '100%', height: 140 },
+  cardBody: { padding: 16, gap: 4 },
+  detailHint: { color: m3.primary, marginTop: 8 },
   backWrap: { alignItems: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
 });

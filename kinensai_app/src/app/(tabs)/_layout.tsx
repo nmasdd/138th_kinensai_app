@@ -32,7 +32,7 @@ function M3NavBar({ state, navigation }: NavBarProps) {
   const visible = TABS.some((t) => state.routes[state.index]?.name === t.name);
   if (!visible) return null;
   return (
-    <View style={[styles.bar, { paddingBottom: insets.bottom }]}>
+    <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {TABS.map((tab) => {
         const route = state.routes.find((r) => r.name === tab.name);
         if (!route) return null;
@@ -57,7 +57,7 @@ function M3NavBar({ state, navigation }: NavBarProps) {
               numberOfLines={1}
               style={[
                 m3type.labelMedium,
-                { color: focused ? m3.onSurface : m3.onSurfaceVariant, fontSize: 11 },
+                { color: focused ? m3.onSurface : m3.onSurfaceVariant, fontSize: 12 },
                 focused && { fontWeight: '700' },
               ]}
             >
@@ -87,9 +87,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: m3.surfaceContainer,
     minHeight: 80,
-    paddingTop: 8,
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderTopWidth: 1,
+    borderTopColor: m3.outlineVariant,
   },
-  item: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 4 },
+  item: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4, minHeight: 56 },
   indicator: {
     width: 64,
     height: 32,

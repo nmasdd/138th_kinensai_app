@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import {
+  AccessibilityRole,
+  ActivityIndicator,
   Animated,
   Platform,
   Pressable,
@@ -14,7 +16,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { m3, m3shape, m3type } from '../theme';
+import { m3, m3layout, m3shape, m3type } from '../theme';
 
 export type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
@@ -25,17 +27,20 @@ export function M3Touch({
   style,
   round = false,
   label,
+  role = 'button',
 }: {
   children: React.ReactNode;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   round?: boolean;
   label?: string;
+  role?: AccessibilityRole;
 }) {
   const [scale] = useState(() => new Animated.Value(1));
   return (
     <Pressable
       accessibilityLabel={label}
+      accessibilityRole={role}
       android_ripple={{ color: 'rgba(0,0,0,0.12)', borderless: false }}
       onPress={onPress}
       onPressIn={() => Animated.timing(scale, { toValue: 0.97, duration: 90, useNativeDriver: true }).start()}
@@ -54,9 +59,10 @@ export function M3Icon({ name, size = 24, color = m3.onSurface }: { name: IconNa
 /** 高さ 64 のスモールトップアプリバー。左 menu→メニュー、右 notifications→通知。 */
 export function TopAppBar({ title }: { title: string }) {
   return (
-    <View style={styles.appBar}>
+    <View style={styles.appBar} accessibilityRole="header">
       <Pressable
         accessibilityLabel="メニューを開く"
+        accessibilityRole="button"
         android_ripple={{ color: 'rgba(0,0,0,0.12)', borderless: true }}
         onPress={() => router.push('/menu')}
         style={styles.appBarIcon}
@@ -68,6 +74,7 @@ export function TopAppBar({ title }: { title: string }) {
       </Text>
       <Pressable
         accessibilityLabel="通知を開く"
+        accessibilityRole="button"
         android_ripple={{ color: 'rgba(0,0,0,0.12)', borderless: true }}
         onPress={() => router.push('/notifications')}
         style={styles.appBarIcon}
@@ -102,7 +109,7 @@ export function M3Button({
     <M3Touch onPress={onPress} label={label} round>
       <View style={[styles.button, { backgroundColor: bg }, variant === 'outlined' && styles.buttonOutlined, style]}>
         {icon && <M3Icon name={icon} size={20} color={fg} />}
-        <Text style={[m3type.labelLarge, { color: fg, fontSize: 15, flexShrink: 1 }]} numberOfLines={1}>
+        <Text style={[m3type.labelLarge, { color: fg, flexShrink: 1 }]} numberOfLines={1}>
           {label}
         </Text>
       </View>
@@ -124,6 +131,7 @@ export function M3SearchBar({
     <View style={styles.searchBar}>
       <M3Icon name="search" color={m3.onSurfaceVariant} />
       <TextInput
+        accessibilityLabel={placeholder}
         style={styles.searchInput}
         placeholder={placeholder}
         placeholderTextColor={m3.onSurfaceVariant}
@@ -133,7 +141,7 @@ export function M3SearchBar({
         returnKeyType="search"
       />
       {value.length > 0 ? (
-        <M3Touch onPress={() => onChangeText('')} label="入力を消去" round>
+        <M3Touch onPress={() => onChangeText('')} label="入力を消去" round style={styles.searchAction}>
           <M3Icon name="clear" color={m3.onSurfaceVariant} />
         </M3Touch>
       ) : (
@@ -146,6 +154,7 @@ export function M3SearchBar({
           }}
           label="音声検索"
           round
+          style={styles.searchAction}
         >
           <M3Icon name="mic" color={m3.onSurfaceVariant} />
         </M3Touch>
@@ -213,7 +222,7 @@ export function M3FAB({
   small?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  const size = small ? 40 : 56;
+  const size = small ? 48 : 56;
   return (
     <M3Touch onPress={onPress} label={label} round>
       <View
@@ -270,8 +279,8 @@ export function M3PrimaryTabs({
       {labels.map((label, i) => {
         const active = i === value;
         return (
-          <M3Touch key={label} onPress={() => onValueChange(i)} label={label}>
-            <View style={styles.tab}>
+          <M3Touch key={label} onPress={() => onValueChange(i)} label={label} role="tab">
+            <View style={styles.tab} accessibilityState={{ selected: active }}>
               <Text style={[m3type.titleSmall, { color: active ? m3.primary : m3.onSurfaceVariant }]}>
                 {label}
               </Text>
@@ -315,8 +324,14 @@ export function M3ListItem({
           <M3Icon name={icon} color={m3.onPrimaryContainer} />
         </View>
         <View style={styles.listText}>
-          <Text style={[m3type.bodyLarge, { color: m3.onSurface }]}>{title}</Text>
-          {sub ? <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>{sub}</Text> : null}
+          <Text style={[m3type.bodyLarge, { color: m3.onSurface }]} numberOfLines={1}>
+            {title}
+          </Text>
+          {sub ? (
+            <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={2}>
+              {sub}
+            </Text>
+          ) : null}
         </View>
       </View>
     </M3Touch>
@@ -325,8 +340,86 @@ export function M3ListItem({
 
 const textBase: TextStyle = {};
 
+/** 中央寄せのローディング表示。見出しや説明は呼び出し側の既存文言を使う。 */
+export function M3LoadingView() {
+  return (
+    <View style={styles.loadingView}>
+      <ActivityIndicator size="large" color={m3.primary} />
+    </View>
+  );
+}
+
+/** 中央寄せの空状態表示。アイコン + 呼び出し側の既存文言を並べる。 */
+export function M3EmptyState({ icon, children }: { icon: IconName; children: React.ReactNode }) {
+  return (
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIcon}>
+        <M3Icon name={icon} size={40} color={m3.onSurfaceVariant} />
+      </View>
+      {children}
+    </View>
+  );
+}
+
 export function M3Headline({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {
   return <Text style={[m3type.headlineMedium, { color: m3.onSurface }, textBase, style]}>{children}</Text>;
+}
+
+/**
+ * 安全な戻る遷移。履歴がない直接アクセス時は警告 (GO_BACK not handled)
+ * を出さず指定フォールバックへ replace する。
+ */
+export function goBackOrHome(fallback: Parameters<typeof router.replace>[0] = '/' as never) {
+  try {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+  } catch {
+    // canGoBack が使えない環境ではフォールバックへ
+  }
+  router.replace(fallback);
+}
+
+/** M3 scrim (モーダル背景)。直書き rgba の代わりに使う。 */
+export const m3scrim = 'rgba(0,0,0,0.4)' as const;
+
+/** M3 区切り線。 */
+export function M3Divider({ style }: { style?: StyleProp<ViewStyle> }) {
+  return <View style={[{ height: 1, backgroundColor: m3.outlineVariant }, style]} />;
+}
+
+/** M3 バッジ (開催中・投票中などの状態表示)。 */
+export function M3Badge({ label }: { label: string }) {
+  return (
+    <View style={styles.badge}>
+      <Text style={[m3type.labelMedium, { color: m3.onPrimary }]}>{label}</Text>
+    </View>
+  );
+}
+
+/** M3 フィルターチップ。選択状態を accessibilityState でも通知する。 */
+export function M3FilterChip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <M3Touch onPress={onPress} label={label} role="button" round>
+      <View
+        style={[styles.chip, selected && styles.chipActive]}
+        accessibilityState={{ selected }}
+      >
+        <Text style={[m3type.labelLarge, { color: selected ? m3.onSecondaryContainer : m3.onSurfaceVariant }]}>
+          {label}
+        </Text>
+      </View>
+    </M3Touch>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -337,17 +430,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: m3.surface,
     paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: m3.outlineVariant,
   },
   appBarIcon: { width: 48, height: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 24 },
   appBarTitle: { flex: 1, textAlign: 'center', color: m3.onSurface },
   button: {
-    height: 56,
+    minHeight: 56,
     borderRadius: m3shape.pill,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 8,
     minWidth: 0,
   },
   buttonOutlined: { borderWidth: 1, borderColor: m3.outline },
@@ -361,6 +457,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   searchInput: { flex: 1, fontSize: 16, color: m3.onSurface, paddingVertical: 8 },
+  searchAction: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
   card: { borderRadius: m3shape.card, padding: 16, overflow: 'hidden' },
   cardShadow: {
     elevation: 1,
@@ -369,6 +466,8 @@ const styles = StyleSheet.create({
   imagePh: {
     backgroundColor: m3.surfaceContainerHighest,
     borderRadius: m3shape.card,
+    borderWidth: 1,
+    borderColor: m3.outlineVariant,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -396,4 +495,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listText: { flex: 1, gap: 2 },
+  badge: {
+    backgroundColor: m3.primary,
+    borderRadius: m3shape.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  chip: {
+    minHeight: m3layout.touchMin,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: m3shape.pill,
+    borderWidth: 1,
+    borderColor: m3.outline,
+  },
+  chipActive: { backgroundColor: m3.secondaryContainer, borderColor: m3.secondaryContainer },
+  loadingView: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  emptyState: { paddingTop: 60, paddingHorizontal: 24, alignItems: 'center', gap: 12 },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: m3.surfaceContainerHigh,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });

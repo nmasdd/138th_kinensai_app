@@ -1,21 +1,32 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { M3Button, TopAppBar } from '../components/m3';
-import { m3 } from '../theme';
+import { M3Button, M3EmptyState, TopAppBar } from '../components/m3';
+import { Rise, ScreenFade } from '../components/anim';
+import { m3, m3type } from '../theme';
 
 export default function PamphletScreen() {
+  const insets = useSafeAreaInsets();
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <TopAppBar title="パンフレット" />
       <View style={styles.body}>
-        <Text style={styles.temp}>仮</Text>
-        <Text style={styles.empty}>まだデータがない</Text>
-        <Text style={styles.note}>デジタルパンフレットのデータが届き次第ここに表示します。</Text>
+        <ScreenFade>
+          <Rise>
+            <M3EmptyState icon="menu-book">
+              <Text style={[m3type.headlineSmall, { color: m3.onSurface, textAlign: 'center' }]} accessibilityRole="header">
+                パンフレットは準備中です
+              </Text>
+              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
+                デジタルパンフレットのデータが届き次第ここに表示します。
+              </Text>
+            </M3EmptyState>
+          </Rise>
+        </ScreenFade>
       </View>
-      <View style={styles.homeWrap}>
-        <M3Button label="ホーム" icon="home" onPress={() => router.replace('/')} />
+      <View style={[styles.homeWrap, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <M3Button label="ホームに戻る" icon="home" onPress={() => router.replace('/(tabs)' as never)} />
       </View>
     </SafeAreaView>
   );
@@ -23,9 +34,6 @@ export default function PamphletScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: m3.surface },
-  body: { flex: 1, padding: 24, gap: 16 },
-  temp: { fontSize: 28, lineHeight: 36, color: m3.onSurface, textAlign: 'left' },
-  empty: { fontSize: 28, lineHeight: 38, color: m3.onSurface, textAlign: 'center', marginTop: 32 },
-  note: { fontSize: 14, lineHeight: 20, color: m3.onSurfaceVariant, textAlign: 'center' },
+  body: { flex: 1, padding: 24 },
   homeWrap: { alignItems: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
 });

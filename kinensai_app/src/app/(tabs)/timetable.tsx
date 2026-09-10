@@ -1,20 +1,93 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { M3Button, TopAppBar } from '../../components/m3';
-import { m3, m3type } from '../../theme';
-import { loadAuditorium, findNow, type StageItem } from '../../data/timetable';
+import { router, useFocusEffect } from 'expo-router';
+import { M3Badge, M3Button, M3LoadingView, TopAppBar } from '../../components/m3';
+import { Rise, Stagger } from '../../components/anim';
+import { m3, m3shape, m3type } from '../../theme';
+import {
+  formatStageTime,
+  isNowLineVisible,
+  loadNowOverride,
+  nowLineIndex,
+  resolveNow,
+  toMinutes,
+  type NowOverride,
+  type StageItem,
+} from '../../data/timetable';
+import { loadAuditorium } from '../../data/timetable';
 import { loadCongestion, congestionLabel, type CongestionLevel } from '../../data/congestion';
 import { useStageGroups } from '../../data/stage';
 
-function TimeRow({ team, time }: { team: string; time: string }) {
+function TimeRow({ team, time, highlighted }: { team: string; time: string; highlighted?: boolean }) {
   return (
-    <View style={styles.timeRow}>
-      <Text style={[m3type.bodyLarge, { color: m3.onSurface, flex: 1 }]} numberOfLines={1}>
+    <View style={[styles.timeRow, highlighted && styles.timeRowNow]} accessibilityState={{ selected: !!highlighted }}>
+      <Text
+        style={[m3type.bodyLarge, { color: highlighted ? m3.onPrimaryContainer : m3.onSurface, flex: 1 }]}
+        numberOfLines={1}
+      >
         {team}
       </Text>
-      <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>{time}</Text>
+      {highlighted ? <M3Badge label="開催中" /> : null}
+      <Text
+        style={[
+          m3type.bodyMedium,
+          { color: highlighted ? m3.onPrimaryContainer : m3.onSurfaceVariant },
+          highlighted && styles.timeNow,
+        ]}
+      >
+        {time}
+      </Text>
+    </View>
+  );
+}
+
+/** 現在時刻を示す赤線。開催時間外は呼び出し側で描画しない */
+function NowLine() {
+  return (
+    <View style={styles.nowLineWrap} accessibilityRole="none" accessibilityLabel="現在時刻">
+      <Text style={[m3type.labelMedium, styles.nowLineLabel]}>いま</Text>
+      <View style={styles.nowLine} />
+    </View>
+  );
+}
+
+function byStart(a: StageItem, b: StageItem): number {
+  return toMinutes(a.start) - toMinutes(b.start);
+}
+
+function DayTimeline({
+  day,
+  items,
+  now,
+  nowId,
+}: {
+  day: number;
+  items: StageItem[];
+  now: Date;
+  nowId: string | null;
+}) {
+  const sorted = useMemo(() => [...items].sort(byStart), [items]);
+  const showLine = isNowLineVisible(day, now, sorted);
+  const lineAt = showLine ? nowLineIndex(sorted, now) : -1;
+  if (sorted.length === 0) {
+    return (
+      <View>
+        <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>登録がありません</Text>
+      </View>
+    );
+  }
+  return (
+    <View>
+      {sorted.map((item, index) => (
+        <React.Fragment key={`a-${day}-${item.id}`}>
+          {showLine && lineAt === index ? <NowLine /> : null}
+          <Stagger index={index % 10}>
+            <TimeRow team={item.team} time={formatStageTime(item)} highlighted={item.id === nowId} />
+          </Stagger>
+        </React.Fragment>
+      ))}
+      {showLine && lineAt >= sorted.length ? <NowLine /> : null}
     </View>
   );
 }
@@ -27,28 +100,44 @@ export default function TimetableScreen() {
   const [items, setItems] = useState<StageItem[]>([]);
   const [congestion, setCongestion] = useState<CongestionLevel>('unknown');
   const [isLoading, setIsLoading] = useState(true);
-  const [now] = useState(() => new Date());
+  const [now, setNow] = useState(() => new Date());
+  const [override, setOverride] = useState<NowOverride>({ auditoriumId: null });
   const { groups } = useStageGroups();
 
-  useEffect(() => {
-    Promise.all([loadAuditorium().catch(() => []), loadCongestion().catch(() => 'unknown' as CongestionLevel)]).then(
-      ([auditorium, level]) => {
+  // 管理者ページの保存を即反映するため、表示のたびに再読込する。
+  // 赤線・強調を動かすため現在時刻も1分ごとに更新する。
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setNow(new Date());
+      Promise.all([
+        loadAuditorium().catch(() => []),
+        loadCongestion().catch(() => 'unknown' as CongestionLevel),
+        loadNowOverride().catch((): NowOverride => ({ auditoriumId: null })),
+      ]).then(([auditorium, level, nowOverride]) => {
+        if (cancelled) return;
         setItems(auditorium);
         setCongestion(level);
+        setOverride(nowOverride);
         setIsLoading(false);
-      },
-    );
-  }, []);
+      });
+      const timer = setInterval(() => setNow(new Date()), 60 * 1000);
+      return () => {
+        cancelled = true;
+        clearInterval(timer);
+      };
+    }, []),
+  );
 
-  const nowItem = findNow(items, now);
-  const saturday = items.filter((i) => i.day === 0);
-  const sunday = items.filter((i) => i.day === 1);
-  const delay = (i: StageItem) => `${i.start}–${i.end}${i.delayMinutes > 0 ? ` (${i.delayMinutes}分遅れ)` : ''}`;
+  const nowItem = resolveNow(items, now, override);
+  const saturday = useMemo(() => items.filter((i) => i.day === 0), [items]);
+  const sunday = useMemo(() => items.filter((i) => i.day === 1), [items]);
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.center}>
-        <ActivityIndicator size="large" color={m3.primary} />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <TopAppBar title="タイムテーブル" />
+        <M3LoadingView />
       </SafeAreaView>
     );
   }
@@ -56,60 +145,74 @@ export default function TimetableScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <TopAppBar title="タイムテーブル" />
-      <ScrollView contentContainerStyle={styles.body}>
-        <View style={styles.stageRow}>
-          <Text style={[m3type.headlineMedium, styles.stageTitle]} numberOfLines={1}>
-            ステージ
+      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+        <Rise delay={40}>
+          <View style={styles.stageRow}>
+            <Text style={[m3type.headlineMedium, styles.stageTitle]} numberOfLines={1}>
+              ステージ
+            </Text>
+            <M3Button
+              label="オーディエンス投票"
+              icon="how-to-vote"
+              variant="tonal"
+              style={styles.voteButton}
+              onPress={() => router.push('/vote')}
+            />
+          </View>
+          <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>
+            {nowItem ? `いま講堂で開催中: ${nowItem.team} (${formatStageTime(nowItem)})` : '現在開催中の演目は確認中です'}
+            {'  ・  '}
+            {congestionLabel(congestion)}
           </Text>
-          <M3Button
-            label="オーディエンス投票"
-            icon="add"
-            variant="tonal"
-            style={styles.voteButton}
-            onPress={() => router.push('/vote')}
-          />
-        </View>
-        <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>
-          {nowItem ? `いま講堂で開催中: ${nowItem.team} (${delay(nowItem)})` : '現在開催中の演目は確認中です'}
-          {'  ・  '}
-          {congestionLabel(congestion)}
-        </Text>
+        </Rise>
 
-        <Text style={[m3type.headlineSmall, { color: m3.onSurface }]}>土曜日</Text>
-        <TimeBox>
-          {groups.map((g) => (
-            <TimeRow key={`sat-${g.id}`} team={g.name} time={g.detail} />
-          ))}
-        </TimeBox>
+        <Rise delay={60}>
+          <Text style={[m3type.headlineSmall, { color: m3.onSurface }]}>土曜日</Text>
+          <TimeBox>
+            {groups.length === 0 ? (
+              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>出演者情報は準備中です</Text>
+            ) : (
+              groups.map((g, i) => (
+                <Stagger key={`sat-${g.id}`} index={i % 10}>
+                  <TimeRow team={g.name} time={g.detail} />
+                </Stagger>
+              ))
+            )}
+          </TimeBox>
+        </Rise>
 
-        <Text style={[m3type.headlineSmall, { color: m3.onSurface }]}>日曜日</Text>
-        <TimeBox>
-          {groups.map((g) => (
-            <TimeRow key={`sun-${g.id}`} team={g.name} time={g.detail} />
-          ))}
-        </TimeBox>
+        <Rise delay={80}>
+          <Text style={[m3type.headlineSmall, { color: m3.onSurface }]}>日曜日</Text>
+          <TimeBox>
+            {groups.length === 0 ? (
+              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>出演者情報は準備中です</Text>
+            ) : (
+              groups.map((g, i) => (
+                <Stagger key={`sun-${g.id}`} index={i % 10}>
+                  <TimeRow team={g.name} time={g.detail} />
+                </Stagger>
+              ))
+            )}
+          </TimeBox>
+        </Rise>
 
-        <Text style={[m3type.headlineMedium, styles.auditoriumTitle]}>講堂</Text>
+        <Rise delay={100}>
+          <Text style={[m3type.headlineMedium, styles.auditoriumTitle]}>講堂</Text>
+        </Rise>
 
-        <Text style={[m3type.headlineSmall, { color: m3.onSurface }]}>土曜日 音楽祭</Text>
-        <TimeBox>
-          {saturday.length === 0 && (
-            <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>登録がありません</Text>
-          )}
-          {saturday.map((item) => (
-            <TimeRow key={`a-sat-${item.id}`} team={item.team} time={delay(item)} />
-          ))}
-        </TimeBox>
+        <Rise delay={120}>
+          <Text style={[m3type.headlineSmall, { color: m3.onSurface }]}>土曜日 音楽祭</Text>
+          <TimeBox>
+            <DayTimeline day={0} items={saturday} now={now} nowId={nowItem?.id ?? null} />
+          </TimeBox>
+        </Rise>
 
-        <Text style={[m3type.headlineSmall, { color: m3.onSurface }]}>日曜日 海神</Text>
-        <TimeBox>
-          {sunday.length === 0 && (
-            <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>登録がありません</Text>
-          )}
-          {sunday.map((item) => (
-            <TimeRow key={`a-sun-${item.id}`} team={item.team} time={delay(item)} />
-          ))}
-        </TimeBox>
+        <Rise delay={140}>
+          <Text style={[m3type.headlineSmall, { color: m3.onSurface }]}>日曜日 海神</Text>
+          <TimeBox>
+            <DayTimeline day={1} items={sunday} now={now} nowId={nowItem?.id ?? null} />
+          </TimeBox>
+        </Rise>
       </ScrollView>
     </SafeAreaView>
   );
@@ -117,25 +220,50 @@ export default function TimetableScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: m3.surface },
-  center: { flex: 1, backgroundColor: m3.surface, justifyContent: 'center', alignItems: 'center' },
-  body: { padding: 16, gap: 12, paddingBottom: 24 },
+  body: { padding: 16, gap: 16, paddingBottom: 32 },
   stageRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   stageTitle: { color: m3.onSurface, flexShrink: 1 },
   voteButton: { flex: 1, minWidth: 0 },
   auditoriumTitle: { color: m3.onSurface },
   timeBox: {
     backgroundColor: m3.surfaceContainerHigh,
-    borderRadius: 28,
+    borderRadius: m3shape.dialog,
     padding: 16,
     minHeight: 76,
-    gap: 4,
+    gap: 8,
   },
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: m3.outlineVariant,
+  },
+  timeRowNow: {
+    backgroundColor: m3.primaryContainer,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 0,
+    borderLeftWidth: 4,
+    borderLeftColor: m3.primary,
+  },
+  timeNow: {
+    fontWeight: '500',
+  },
+  nowLineWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  nowLineLabel: {
+    color: m3.error,
+  },
+  nowLine: {
+    flex: 1,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: m3.error,
   },
 });

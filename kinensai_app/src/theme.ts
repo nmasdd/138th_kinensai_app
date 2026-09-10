@@ -2,7 +2,15 @@
  * Material 3 Expressive カスタムライトカラースキーム (固定ライトモード)。
  * UI の色は必ずこのロール経由で参照し、ハードコードした色は使わない。
  * Android のシステム書体は Roboto のため fontFamily は指定しない。
+ *
+ * 背景は白 #ffffff、アクセントはオレンジ系。ブランドカラー #FF6B00 は
+ * 白背景上でのコントラストが不足するため、テキストや塗りには可読性を
+ * 確保した濃色バリアント primary #D14E00 を使うこと。
+ * 固定ライト配色のため userInterfaceStyle automatic のダークモードでも破綻しない。
  */
+
+/** ブランドオレンジ (装飾用の参照値。テキスト/塗りには m3.primary を使う)。 */
+export const brandOrange = '#FF6B00' as const;
 
 export const m3 = {
   primary: '#D14E00',
@@ -13,7 +21,7 @@ export const m3 = {
   onSecondaryContainer: '#2F1D00',
   tertiaryContainer: '#FFE3C2',
   onTertiaryContainer: '#2A1700',
-  surface: '#FEF8F4',
+  surface: '#FFFFFF',
   surfaceContainerLow: '#F8F3EE',
   surfaceContainer: '#F2EDE8',
   surfaceContainerHigh: '#ECE7E3',
@@ -55,6 +63,17 @@ export const m3shape = {
   fab: 16,
   fabLarge: 28,
   fabSmall: 12,
+} as const;
+
+/**
+ * レイアウトの基準値。余白・タップ領域の統一に使う。
+ * touchMin はタップ領域の最小サイズ (44dp 前後)。
+ */
+export const m3layout = {
+  touchMin: 44,
+  screenPadding: 16,
+  sectionGap: 16,
+  cardGap: 12,
 } as const;
 
 /**

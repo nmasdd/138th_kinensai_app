@@ -1,25 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { M3Button, TopAppBar } from '../../components/m3';
+import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
+import { M3Button, M3LoadingView, TopAppBar, goBackOrHome } from '../../components/m3';
+import { ScreenFade } from '../../components/anim';
 import { loadNotifications, type AppNotification } from '../../data/notifications';
-import { m3 } from '../../theme';
+import { m3, m3type } from '../../theme';
 
 export default function NotificationDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const [item, setItem] = useState<AppNotification | null | undefined>(undefined);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
+    let alive = true;
     loadNotifications()
       .catch(() => [])
-      .then((list) => setItem(list.find((n) => n.id === id) ?? null));
+      .then((list) => {
+        if (alive) setItem(list.find((n) => n.id === id) ?? null);
+      });
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
   if (item === undefined) {
     return (
       <SafeAreaView style={styles.center} edges={['top']}>
-        <ActivityIndicator size="large" color={m3.primary} />
+        <TopAppBar title="通知" />
+        <M3LoadingView />
       </SafeAreaView>
     );
   }
@@ -27,18 +36,22 @@ export default function NotificationDetailScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <TopAppBar title={item?.title ?? '通知'} />
-      <View style={styles.body}>
-        {item ? (
-          <>
-            <Text style={styles.date}>{item.date}</Text>
-            <Text style={styles.detail}>{item.body}</Text>
-          </>
-        ) : (
-          <Text style={styles.detail}>この通知は見つかりませんでした。</Text>
-        )}
-      </View>
-      <View style={styles.backWrap}>
-        <M3Button label="戻る" icon="undo" onPress={() => router.back()} />
+      <ScreenFade>
+        <View style={styles.body}>
+          {item ? (
+            <>
+              <Text style={[m3type.labelMedium, { color: m3.onSurfaceVariant, marginBottom: 12 }]}>{item.date}</Text>
+              <Text style={[m3type.bodyLarge, { color: m3.onSurface, textAlign: 'center' }]}>{item.body}</Text>
+            </>
+          ) : (
+            <Text style={[m3type.bodyLarge, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
+              この通知は見つかりませんでした。
+            </Text>
+          )}
+        </View>
+      </ScreenFade>
+      <View style={[styles.backWrap, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <M3Button label="通知一覧に戻る" icon="undo" onPress={() => goBackOrHome('/notifications' as never)} />
       </View>
     </SafeAreaView>
   );
@@ -46,9 +59,7 @@ export default function NotificationDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: m3.surface },
-  center: { flex: 1, backgroundColor: m3.surface, justifyContent: 'center', alignItems: 'center' },
+  center: { flex: 1, backgroundColor: m3.surface },
   body: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  date: { fontSize: 14, color: m3.onSurfaceVariant, marginBottom: 12 },
-  detail: { fontSize: 28, lineHeight: 38, color: m3.onSurface, textAlign: 'center' },
   backWrap: { alignItems: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
 });

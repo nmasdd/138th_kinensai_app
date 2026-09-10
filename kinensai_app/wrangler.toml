@@ -1,0 +1,14 @@
+name = "kinensai-app"
+compatibility_date = "2026-09-10"
+main = "./worker/src/index.ts"
+
+# Expo Web の静的ビルド (npx expo export --platform web) の出力
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# カスタムドメイン https://app.kinensai.jp/
+[[routes]]
+pattern = "app.kinensai.jp"
+custom_domain = true

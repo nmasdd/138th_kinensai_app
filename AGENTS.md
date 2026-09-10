@@ -32,3 +32,15 @@
 - タブアイコンは `kinensai_app/icon/` (not `assets/`) を `require('../../icon/...')` で参照。展示IDは `土曜日_1A` 形式。
 - `app.json` の `experiments.typedRoutes, reactCompiler` 有効。`@/*→src/*` エイリアス (`tsconfig.json`)。`expo-env.d.ts` は生成物。
 - 画面雛形は `SafeAreaView `#ffffff` + `Header`。色は現状 `#208AEF` (青) が残っている箇所あり — 新規UIは青を使わずオレンジ系に寄せる。
+
+## Cloudflare 公開 (https://app.kinensai.jp/)
+- Worker名 `kinensai-app` (zone `kinensai.jp`、カスタムドメイン `app.kinensai.jp`)。`138th-kinensai` (本体サイト) には触らない。
+- 構成 (`kinensai_app/` 配下): `wrangler.toml` (assets `./dist` + `not_found_handling=single-page-application` + routes custom_domain) と `worker/src/index.ts` (main、ASSETSバインディング)。`worker/` も `tsc --noEmit` の検査対象 (DOM libで型検査)。
+- デプロイ手順 (`kinensai_app/` で、要 `npx wrangler login`):
+  ```
+  npx expo export --platform web
+  npx wrangler deploy
+  ```
+  `dist/` は gitignore だがデプロイ入力のため export で再生成すること。`--dry-run` で事前検証可。
+- 管理者認証はサーバ側: `POST /api/admin/login` (検証→署名付きトークン発行・12時間有効) と `POST /api/admin/verify`。秘密はWorkerシークレット `ADMIN_PASSWORD` / `ADMIN_SESSION_SECRET` のみ (API `PUT /accounts/{id}/workers/scripts/kinensai-app/secrets` か `wrangler secret put` で設定)。パスワード・トークンをコード/バンドル/一時ファイル/チャット出力に残さない。`AdminGate` はトークンをメモリ (+WebはsessionStorage) に保持。
+- 落とし穴: ローカル `expo start --web` では `/api/admin/*` がないため管理者ログイン不可 (Webは同一オリジン相対、ネイティブは本番URL直指し)。自宅LANのDNSが古いと `app.kinensai.jp` が引けないことがある (Google DNS `https://dns.google/resolve?name=app.kinensai.jp&type=A` で切分け)。bash実行は `cmd /c` 経由 (`&&` 不可、`A && B` は `A; if ($?) { B }`)。

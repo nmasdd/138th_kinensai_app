@@ -23,6 +23,10 @@ yarn-debug.log*
 yarn-error.log*
 *.log
 
+# Cloudflare Workers
+.wrangler/
+.dev.vars*
+
 # OS
 .DS_Store
 Thumbs.db

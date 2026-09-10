@@ -3,8 +3,14 @@
   "mcp": {
     "playwright": {
       "type": "local",
-      "command": ["npx", "-y", "@playwright/mcp@latest", "--executable-path", "/home/nmasdd/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome", "--no-sandbox", "--isolated", "--viewport-size", "390x844"],
-      "enabled": true,
+      "command": [
+        "npx",
+        "-y",
+        "@playwright/mcp@latest",
+        "--viewport-size",
+        "390x844"
+      ],
+      "enabled": true
     }
   }
 }

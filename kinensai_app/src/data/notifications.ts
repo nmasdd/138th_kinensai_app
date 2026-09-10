@@ -1,10 +1,12 @@
-import * as FileSystem from 'expo-file-system/legacy';
+import { loadJSON, saveJSON } from './kvStore';
 
 export interface AppNotification {
   id: string;
   title: string;
   body: string;
   date: string;
+  /** 管理者ページで登録した画像 (file:// URI または dataURL)。なければ null */
+  imageUri?: string | null;
 }
 
 const bundled: AppNotification[] = [
@@ -16,21 +18,17 @@ const bundled: AppNotification[] = [
   },
 ];
 
-const FILE = `${FileSystem.documentDirectory}notifications.json`;
+const KEY = 'notifications.json';
 
 /**
- * 実行委員会からの通知。配信手段が決まるまでは同梱の既定文を表示し、
- * notifications.json を端末に置けば差し替えられる。
+ * 実行委員会からの通知。管理者ページから保存・差し替えできる。
  */
 export async function loadNotifications(): Promise<AppNotification[]> {
-  if (!FileSystem.documentDirectory) return bundled;
-  try {
-    const info = await FileSystem.getInfoAsync(FILE);
-    if (info.exists) {
-      const raw = await FileSystem.readAsStringAsync(FILE);
-      const parsed: unknown = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed as AppNotification[];
-    }
-  } catch {}
+  const parsed = await loadJSON<unknown>(KEY, null);
+  if (Array.isArray(parsed)) return parsed as AppNotification[];
   return bundled;
+}
+
+export async function saveNotifications(list: AppNotification[]): Promise<void> {
+  await saveJSON(KEY, list);
 }
