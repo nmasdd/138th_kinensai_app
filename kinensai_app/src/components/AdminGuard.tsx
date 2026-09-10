@@ -11,8 +11,8 @@ import { m3, m3type } from '../theme';
 
 /**
  * 管理者ページ用の公開フロー案内バナー (ブロックしない)。
- * 「この端末の保存はプレビュー。全世界への反映はデータ管理からの公開手順」
- * を明示する。公開ビルドでも管理者ページ自体は動作する。
+ * 「保存はこの端末のプレビュー。全世界への反映はデータ管理の全世界に公開」
+ * を明示する。
  */
 export function AdminPublishNote() {
   const configured = isRemoteContentConfigured();
@@ -36,8 +36,8 @@ export function AdminPublishNote() {
         </Text>
         <Text style={[m3type.bodyMedium, { color: m3.onPrimaryContainer }]}>
           {configured
-            ? `各画面の保存はこの端末のプレビューです。「データ管理」で公開バンドルを書き出し、配信先に配置すると全端末に反映されます。`
-            : `各画面の保存はこの端末のプレビューです。全端末へ反映するには、配信URL (extra.contentUrl) の設定と「データ管理」からの公開手順が必要です。`}
+            ? `各画面の保存はこの端末のプレビューです。「データ管理」の「全世界に公開」で全端末に反映されます (最大5分遅延)。`
+            : `各画面の保存はこの端末のプレビューです。全端末へ反映するには、配信URL (extra.contentUrl) の設定が必要です。`}
         </Text>
       </View>
     </View>
@@ -55,6 +55,16 @@ export { getContentUrl };
 const TOKEN_STORAGE_KEY = 'kinensai:adminToken';
 /** ネイティブ (Expo Go/開発ビルド) には同一オリジンがないため本番URLへ向ける。 */
 const ADMIN_API_BASE = Platform.OS === 'web' ? '' : 'https://app.kinensai.jp';
+
+/** 管理者APIの起点 (/admin/data の公開処理から使う)。 */
+export function getAdminApiBase(): string {
+  return ADMIN_API_BASE;
+}
+
+/** 認証済みの管理者トークン (未認証なら null)。公開処理の署名に使う。 */
+export function getAdminToken(): string | null {
+  return adminToken;
+}
 
 let adminToken: string | null = null;
 const adminAuthListeners = new Set<() => void>();

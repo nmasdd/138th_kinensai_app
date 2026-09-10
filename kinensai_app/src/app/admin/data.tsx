@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, Text, TextInput, View } from 'react-native';
+import { Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { M3Button, TopAppBar } from '../../components/m3';
@@ -9,7 +9,7 @@ import {
   useAdminNotice,
 } from '../../components/AdminSaveBar';
 import { Section, adminStyles } from '../../components/adminUi';
-import { AdminGate } from '../../components/AdminGuard';
+import { AdminGate, getAdminApiBase, getAdminToken } from '../../components/AdminGuard';
 import {
   loadClassOverrides,
   saveClassOverrides,
@@ -30,8 +30,8 @@ import {
 } from '../../data/timetable';
 import { loadCongestion, saveCongestion, type CongestionLevel } from '../../data/congestion';
 import { saveStageGroups, type StageGroup } from '../../data/stage';
-import { loadJSON } from '../../data/kvStore';
-import { getContentUrl, isRemoteContentConfigured } from '../../data/remoteConfig';
+import { SHARED_CONTENT_KEYS, clearLocalKey, loadJSON } from '../../data/kvStore';
+import { clearRemoteCache, getContentUrl, isRemoteContentConfigured } from '../../data/remoteConfig';
 import { m3, m3type } from '../../theme';
 
 /**
@@ -130,33 +130,88 @@ function AdminDataContent() {
   };
 
   /**
-   * 全世界公開用の分割バンドル書き出し。
-   * 各共有キーを `{key}.json` 形式で `===== FILE: {key} =====` 区切りで連結する。
-   * 運営は各ブロックを同名ファイルとして配信URL (`contentUrl`) 配下に配置する。
-   * 全端末は次回表示時に取得し、同梱値より優先して表示する。
+   * 全世界公開用の分割バンドル (各共有キーの現在有効値)。
+   * 読込優先度 (端末プレビュー→全世界配信→同梱値) の解決済み値なので、
+   * そのまま公開しても表示が変わることはない (安全な初回公開が可能)。
+   */
+  const collectPublishEntries = async (): Promise<Array<[string, unknown]>> =>
+    Promise.all([
+      loadClassOverrides().then((v) => ['class-overrides.json', v] as [string, unknown]),
+      loadCustomClasses().then((v) => ['custom-classes.json', v] as [string, unknown]),
+      loadVolunteers().then((v) => ['volunteers.json', v] as [string, unknown]),
+      loadTicketMap().then((v) => ['tickets.json', v] as [string, unknown]),
+      loadNotifications().then((v) => ['notifications.json', v] as [string, unknown]),
+      loadJSON<unknown>('stage-groups.json', null).then((v) => ['stage-groups.json', v] as [string, unknown]),
+      loadCongestion().then((v) => ['congestion.json', { level: v }] as [string, unknown]),
+      loadDelayMap().then((v) => ['delays.json', v] as [string, unknown]),
+      loadTimetableOverrides().then((v) => ['timetable-overrides.json', v] as [string, unknown]),
+      loadJSON<unknown>('picks.json', null).then((v) => ['picks.json', v] as [string, unknown]),
+      loadJSON<unknown>('now-override.json', null).then((v) => ['now-override.json', v] as [string, unknown]),
+    ]);
+
+  /**
+   * 全世界公開用の分割バンドル書き出し (バックアップ・目視確認用)。
+   * サーバへの公開は「全世界に公開」ボタンで行う。
    */
   const exportPublishBundle = async (): Promise<string> => {
     try {
-      const entries: Array<[string, unknown]> = await Promise.all([
-        loadClassOverrides().then((v) => ['class-overrides.json', v] as [string, unknown]),
-        loadCustomClasses().then((v) => ['custom-classes.json', v] as [string, unknown]),
-        loadVolunteers().then((v) => ['volunteers.json', v] as [string, unknown]),
-        loadTicketMap().then((v) => ['tickets.json', v] as [string, unknown]),
-        loadNotifications().then((v) => ['notifications.json', v] as [string, unknown]),
-        loadJSON<unknown>('stage-groups.json', null).then((v) => ['stage-groups.json', v] as [string, unknown]),
-        loadCongestion().then((v) => ['congestion.json', { level: v }] as [string, unknown]),
-        loadDelayMap().then((v) => ['delays.json', v] as [string, unknown]),
-        loadTimetableOverrides().then((v) => ['timetable-overrides.json', v] as [string, unknown]),
-        loadJSON<unknown>('picks.json', null).then((v) => ['picks.json', v] as [string, unknown]),
-        loadJSON<unknown>('now-override.json', null).then((v) => ['now-override.json', v] as [string, unknown]),
-      ]);
+      const entries = await collectPublishEntries();
       setIoText(
         entries.map(([key, value]) => `===== FILE: ${key} =====\n${JSON.stringify(value, null, 2)}`).join('\n\n'),
       );
-      return '公開バンドルを書き出しました。各ファイルを配信先に配置してください';
+      return '公開バンドルを書き出しました (バックアップ・確認用。公開は「全世界に公開」で行います)';
     } catch {
       throw new Error('公開バンドルの書き出しに失敗しました');
     }
+  };
+
+  /**
+   * 全世界に公開: 現在有効値をサーバ (KV) へ書き込み、全端末に配信する。
+   * 管理者トークン必須。失敗時は例外メッセージを投げる。
+   */
+  const publishWorldwide = async (): Promise<string> => {
+    const token = getAdminToken();
+    if (!token) throw new Error('認証が切れています。ページを開き直して再認証してください');
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && !window.navigator.onLine) {
+      throw new Error('オフラインです。接続を確認してください');
+    }
+    const entries = await collectPublishEntries();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30000);
+    try {
+      const res = await fetch(`${getAdminApiBase()}/api/content/publish`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ token, files: Object.fromEntries(entries) }),
+        signal: ctrl.signal,
+      });
+      let parsed: { ok?: unknown; published?: unknown } | null = null;
+      try {
+        parsed = (await res.json()) as { ok?: unknown; published?: unknown };
+      } catch {}
+      if (!res.ok || parsed?.ok !== true) {
+        if (res.status === 401) throw new Error('認証が切れています。再認証してください');
+        if (res.status === 429) throw new Error('試行回数が多すぎます。時間をおいてください');
+        throw new Error('公開に失敗しました (サーバ応答を確認してください)');
+      }
+      const count = Array.isArray(parsed.published) ? parsed.published.length : entries.length;
+      return `全世界に公開しました (${count}件。全端末に最大5分で反映)`;
+    } catch (e) {
+      if (e instanceof Error) throw e;
+      throw new Error('公開に失敗しました (接続を確認してください)');
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  /**
+   * 端末プレビューの破棄: この端末の管理者編集を取り消し、全世界配信の値に戻す。
+   * 全世界の配信内容は変わらない。
+   */
+  const discardPreview = async (): Promise<string> => {
+    await Promise.all(SHARED_CONTENT_KEYS.map((key) => clearLocalKey(key)));
+    clearRemoteCache();
+    return 'この端末のプレビューを破棄しました (全世界の配信は変わりません)';
   };
 
   const contentUrl = getContentUrl();
@@ -183,10 +238,12 @@ function AdminDataContent() {
           <Section title="全世界への公開 (配信)">
             <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, marginBottom: 8 }]}>
               {remoteReady
-                ? `配信先: ${contentUrl}\n「公開バンドル書き出し」で下の欄に出力し、各ファイルを同名で配信先に配置すると、全端末の次回表示時に反映されます (最大5分遅延)。`
-                : '配信URL (app.json の extra.contentUrl) が未設定です。設定後に「公開バンドル書き出し」の各ファイルを同名で配信先に配置すると、全端末に反映されます。未設定の間は管理者編集はこの端末のプレビューに留まります。'}
+                ? `配信先: ${contentUrl}\n「全世界に公開」でこの端末の現在値 (編集中のプレビュー含む) を全端末へ配信します (最大5分遅延)。「プレビュー破棄」でこの端末の編集を取り消せます。`
+                : '配信URL (app.json の extra.contentUrl) が未設定です。設定後に「全世界に公開」で配信できます。未設定の間は管理者編集はこの端末のプレビューに留まります。'}
             </Text>
-            <M3Button label="公開バンドル書き出し" icon="public" variant="tonal" onPress={() => { exportPublishBundle().then(showOk).catch((e: unknown) => showErr(e instanceof Error ? e.message : '書き出しに失敗しました')); }} />
+            <M3Button label="全世界に公開" icon="public" onPress={() => { publishWorldwide().then(showOk).catch((e: unknown) => showErr(e instanceof Error ? e.message : '公開に失敗しました')); }} />
+            <M3Button label="プレビュー破棄" icon="undo" variant="tonal" onPress={() => { discardPreview().then(showOk).catch((e: unknown) => showErr(e instanceof Error ? e.message : '破棄に失敗しました')); }} />
+            <M3Button label="公開バンドル書き出し" icon="download" variant="outlined" onPress={() => { exportPublishBundle().then(showOk).catch((e: unknown) => showErr(e instanceof Error ? e.message : '書き出しに失敗しました')); }} />
           </Section>
           <View style={adminStyles.backWrap}>
             <M3Button label="目次に戻る" icon="undo" variant="tonal" onPress={() => router.push('/admin/index' as never)} />

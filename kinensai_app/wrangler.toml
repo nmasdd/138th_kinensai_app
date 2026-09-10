@@ -8,6 +8,11 @@ directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
+# 全世界配信 (共有コンテンツ) のKV
+[[kv_namespaces]]
+binding = "CONTENT"
+id = "56b863becb354e94b05affe288ce9ffb"
+
 # カスタムドメイン https://app.kinensai.jp/
 [[routes]]
 pattern = "app.kinensai.jp"

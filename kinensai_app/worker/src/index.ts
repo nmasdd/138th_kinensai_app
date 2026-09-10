@@ -1,8 +1,10 @@
 /**
- * kinensai-app Worker: 管理者パスワード認証API + 静的アセット配信。
+ * kinensai-app Worker: 管理者認証API + 全世界配信 (共有コンテンツ) API + 静的アセット配信。
  *
- * - POST /api/admin/login  { password: string } → 200 { ok:true, token, expiresAt } / 401 { ok:false }
- * - POST /api/admin/verify { token: string }   → 200 { ok:true } / 200 { ok:false }
+ * - POST /api/admin/login  { password } → 200 { ok:true, token, expiresAt } / 401 { ok:false }
+ * - POST /api/admin/verify { token }    → 200 { ok:true } / 200 { ok:false }
+ * - GET  /api/content/<name>.json       → KVから共有コンテンツを公開配信 (認証不要・5分キャッシュ)
+ * - POST /api/content/publish { token, files: { name: value } } → 管理者トークンでKVへ公開
  * - 上記以外 → ASSETS.fetch(request) (Expo Web の静的配信。SPAフォールバックは
  *   wrangler.toml の assets.not_found_handling に従う)
  *
@@ -12,19 +14,46 @@
  * 有効期限 (12時間) 付き。検証はタイミングセーフな比較で行う。
  */
 
+interface AssetsBinding {
+  fetch: (request: Request) => Promise<Response>;
+}
+
+interface KvBinding {
+  get: (key: string, type: 'text') => Promise<string | null>;
+  put: (key: string, value: string) => Promise<void>;
+  delete: (key: string) => Promise<void>;
+}
+
 interface Env {
-  ASSETS: { fetch: (request: Request) => Promise<Response> };
+  ASSETS: AssetsBinding;
+  CONTENT: KvBinding;
   ADMIN_PASSWORD?: string;
   ADMIN_SESSION_SECRET?: string;
 }
 
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
-const MAX_BODY_BYTES = 4 * 1024;
-const FETCH_TIMEOUT_NOTE = 'no-store';
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+const MAX_FILE_BYTES = 1024 * 1024;
+
+/** 公開対象の共有コンテンツキー (/admin/data の公開バンドルと一致させる)。 */
+const CONTENT_KEYS = new Set([
+  'class-overrides.json',
+  'custom-classes.json',
+  'volunteers.json',
+  'tickets.json',
+  'notifications.json',
+  'stage-groups.json',
+  'congestion.json',
+  'delays.json',
+  'timetable-overrides.json',
+  'picks.json',
+  'now-override.json',
+]);
 
 /** isolate内ベストエフォートの総当たり対策 (分散環境では完全ではない)。 */
 const attempts = new Map<string, { count: number; resetAt: number }>();
-const ATTEMPT_LIMIT = 10;
+const LOGIN_ATTEMPT_LIMIT = 10;
+const PUBLISH_ATTEMPT_LIMIT = 30;
 const ATTEMPT_WINDOW_MS = 5 * 60 * 1000;
 
 const te = new TextEncoder();
@@ -60,12 +89,23 @@ async function signExpiry(key: CryptoKey, exp: number): Promise<string> {
   return toHex(sig);
 }
 
-function json(data: unknown, status = 200): Response {
+/** 管理者トークンの検証。秘密未設定・期限切れ・署名不一致はすべて false。 */
+async function verifyAdminToken(token: string, sessionSecret: string): Promise<boolean> {
+  if (!sessionSecret || !token) return false;
+  const [expRaw, sig] = token.split('.');
+  const exp = Number(expRaw);
+  if (!expRaw || !sig || !Number.isFinite(exp) || exp <= Date.now()) return false;
+  const key = await importSessionKey(sessionSecret);
+  const expected = await signExpiry(key, exp);
+  return timingSafeEqual(sig, expected);
+}
+
+function json(data: unknown, status = 200, cacheControl = 'no-store'): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      'cache-control': FETCH_TIMEOUT_NOTE,
+      'cache-control': cacheControl,
     },
   });
 }
@@ -76,19 +116,20 @@ function clientIp(request: Request): string {
   );
 }
 
-function rateLimited(ip: string): boolean {
+function rateLimited(ip: string, key: string, limit: number): boolean {
   const now = Date.now();
-  const cur = attempts.get(ip);
+  const mapKey = `${key}:${ip}`;
+  const cur = attempts.get(mapKey);
   if (!cur || now >= cur.resetAt) {
-    attempts.set(ip, { count: 1, resetAt: now + ATTEMPT_WINDOW_MS });
+    attempts.set(mapKey, { count: 1, resetAt: now + ATTEMPT_WINDOW_MS });
     return false;
   }
   cur.count += 1;
-  return cur.count > ATTEMPT_LIMIT;
+  return cur.count > limit;
 }
 
-function resetAttempts(ip: string): void {
-  attempts.delete(ip);
+function resetAttempts(ip: string, key: string): void {
+  attempts.delete(`${key}:${ip}`);
 }
 
 async function readJsonBody(request: Request): Promise<unknown> {
@@ -114,11 +155,11 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
   if (!candidate) return json({ ok: false }, 401);
 
   const ip = clientIp(request);
-  if (rateLimited(ip)) return json({ ok: false }, 429);
+  if (rateLimited(ip, 'login', LOGIN_ATTEMPT_LIMIT)) return json({ ok: false }, 429);
 
   if (!timingSafeEqual(candidate, password)) return json({ ok: false }, 401);
 
-  resetAttempts(ip);
+  resetAttempts(ip, 'login');
   const exp = Date.now() + TOKEN_TTL_MS;
   const key = await importSessionKey(sessionSecret);
   const sig = await signExpiry(key, exp);
@@ -133,13 +174,61 @@ async function handleVerify(request: Request, env: Env): Promise<Response> {
     typeof body === 'object' && body !== null && 'token' in body
       ? String((body as { token: unknown }).token ?? '')
       : '';
-  const [expRaw, sig] = token.split('.');
-  const exp = Number(expRaw);
-  if (!expRaw || !sig || !Number.isFinite(exp) || exp <= Date.now()) return json({ ok: false });
-  const key = await importSessionKey(sessionSecret);
-  const expected = await signExpiry(key, exp);
-  if (!timingSafeEqual(sig, expected)) return json({ ok: false });
+  if (!(await verifyAdminToken(token, sessionSecret))) return json({ ok: false });
   return json({ ok: true });
+}
+
+/** 共有コンテンツの公開配信 (認証不要)。 */
+async function handleContentGet(name: string, env: Env): Promise<Response> {
+  if (!CONTENT_KEYS.has(name)) return json({ ok: false }, 404);
+  const raw = await env.CONTENT.get(name, 'text');
+  if (raw === null) return json({ ok: false }, 404);
+  return new Response(raw, {
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'public, max-age=300',
+    },
+  });
+}
+
+/** 共有コンテンツの公開 (管理者トークン必須)。files の値はそのまま各キーに保存する。 */
+async function handleContentPublish(request: Request, env: Env): Promise<Response> {
+  const sessionSecret = env.ADMIN_SESSION_SECRET ?? '';
+  if (!sessionSecret) return json({ ok: false }, 500);
+  const ip = clientIp(request);
+  if (rateLimited(ip, 'publish', PUBLISH_ATTEMPT_LIMIT)) return json({ ok: false }, 429);
+
+  const body = await readJsonBody(request);
+  const token =
+    typeof body === 'object' && body !== null && 'token' in body
+      ? String((body as { token: unknown }).token ?? '')
+      : '';
+  if (!(await verifyAdminToken(token, sessionSecret))) return json({ ok: false }, 401);
+  const files =
+    typeof body === 'object' && body !== null && 'files' in body
+      ? ((body as { files: unknown }).files as Record<string, unknown>)
+      : null;
+  if (!files || typeof files !== 'object' || Array.isArray(files)) return json({ ok: false }, 400);
+
+  const names = Object.keys(files);
+  if (names.length === 0 || names.length > CONTENT_KEYS.size) return json({ ok: false }, 400);
+  const serialized = new Map<string, string>();
+  for (const name of names) {
+    if (!CONTENT_KEYS.has(name)) return json({ ok: false }, 400);
+    let raw: string;
+    try {
+      raw = JSON.stringify(files[name] ?? null);
+    } catch {
+      return json({ ok: false }, 400);
+    }
+    if (te.encode(raw).length > MAX_FILE_BYTES) return json({ ok: false }, 413);
+    serialized.set(name, raw);
+  }
+  for (const [name, raw] of serialized) {
+    await env.CONTENT.put(name, raw);
+  }
+  resetAttempts(ip, 'publish');
+  return json({ ok: true, published: names });
 }
 
 export default {
@@ -150,6 +239,15 @@ export default {
     }
     if (request.method === 'POST' && url.pathname === '/api/admin/verify') {
       return handleVerify(request, env);
+    }
+    if (
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      url.pathname.startsWith('/api/content/')
+    ) {
+      return handleContentGet(url.pathname.slice('/api/content/'.length), env);
+    }
+    if (request.method === 'POST' && url.pathname === '/api/content/publish') {
+      return handleContentPublish(request, env);
     }
     return env.ASSETS.fetch(request);
   },

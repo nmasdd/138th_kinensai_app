@@ -45,7 +45,7 @@
       "reactCompiler": true
     },
     "extra": {
-      "contentUrl": ""
+      "contentUrl": "https://app.kinensai.jp/api/content"
     }
   }
 }

@@ -43,4 +43,5 @@
   ```
   `dist/` は gitignore だがデプロイ入力のため export で再生成すること。`--dry-run` で事前検証可。
 - 管理者認証はサーバ側: `POST /api/admin/login` (検証→署名付きトークン発行・12時間有効) と `POST /api/admin/verify`。秘密はWorkerシークレット `ADMIN_PASSWORD` / `ADMIN_SESSION_SECRET` のみ (API `PUT /accounts/{id}/workers/scripts/kinensai-app/secrets` か `wrangler secret put` で設定)。パスワード・トークンをコード/バンドル/一時ファイル/チャット出力に残さない。`AdminGate` はトークンをメモリ (+WebはsessionStorage) に保持。
+- 全世界配信: KV名前空間 `kinensai-content` (binding `CONTENT`) + `GET /api/content/<name>.json` (公開・5分キャッシュ) + `POST /api/content/publish` (管理者トークン必須・11キーのホワイトリスト検証)。クライアントは `app.json extra.contentUrl=https://app.kinensai.jp/api/content` から取得。読込優先度は端末プレビュー→全世界配信→同梱値 (`kvStore.ts`)。`/admin/data` の「全世界に公開」が現在有効値を一括公開 (解決済み値のため初回公開も安全)、「プレビュー破棄」が端末編集の取消。公開バンドル書き出しはバックアップ・確認用に残す。
 - 落とし穴: ローカル `expo start --web` では `/api/admin/*` がないため管理者ログイン不可 (Webは同一オリジン相対、ネイティブは本番URL直指し)。自宅LANのDNSが古いと `app.kinensai.jp` が引けないことがある (Google DNS `https://dns.google/resolve?name=app.kinensai.jp&type=A` で切分け)。bash実行は `cmd /c` 経由 (`&&` 不可、`A && B` は `A; if ($?) { B }`)。
