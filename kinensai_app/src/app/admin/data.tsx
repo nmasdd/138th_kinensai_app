@@ -32,6 +32,7 @@ import { loadCongestion, saveCongestion, type CongestionLevel } from '../../data
 import { saveStageGroups, type StageGroup } from '../../data/stage';
 import { SHARED_CONTENT_KEYS, clearLocalKey, loadJSON } from '../../data/kvStore';
 import { clearRemoteCache, getContentUrl, isRemoteContentConfigured } from '../../data/remoteConfig';
+import { rewriteImagesForPublish } from '../../data/imageUpload';
 import { m3, m3type } from '../../theme';
 
 /**
@@ -176,13 +177,23 @@ function AdminDataContent() {
       throw new Error('オフラインです。接続を確認してください');
     }
     const entries = await collectPublishEntries();
+    // 端末ローカル・dataURLの画像は先にサーバへ上げ、公開URLに書き換える
+    const { entries: publishEntries, result: imgResult } = await rewriteImagesForPublish(
+      entries,
+      token,
+      getAdminApiBase(),
+    );
+    const payload = JSON.stringify({ token, files: Object.fromEntries(publishEntries) });
+    if (payload.length > 1800000) {
+      throw new Error('データが大きすぎます。画像の点数・サイズを減らして再試行してください');
+    }
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 30000);
+    const timer = setTimeout(() => ctrl.abort(), 120000);
     try {
       const res = await fetch(`${getAdminApiBase()}/api/content/publish`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ token, files: Object.fromEntries(entries) }),
+        body: payload,
         signal: ctrl.signal,
       });
       let parsed: { ok?: unknown; published?: unknown } | null = null;
@@ -192,10 +203,15 @@ function AdminDataContent() {
       if (!res.ok || parsed?.ok !== true) {
         if (res.status === 401) throw new Error('認証が切れています。再認証してください');
         if (res.status === 429) throw new Error('試行回数が多すぎます。時間をおいてください');
+        if (res.status === 413) throw new Error('データが大きすぎます。画像の点数・サイズを減らしてください');
         throw new Error('公開に失敗しました (サーバ応答を確認してください)');
       }
       const count = Array.isArray(parsed.published) ? parsed.published.length : entries.length;
-      return `全世界に公開しました (${count}件。全端末に最大5分で反映)`;
+      const imgNote =
+        imgResult.uploaded > 0 || imgResult.failed > 0
+          ? ` (画像${imgResult.uploaded}件を配信化${imgResult.failed > 0 ? `・${imgResult.failed}件は除外` : ''})`
+          : '';
+      return `全世界に公開しました (${count}件。全端末に最大5分で反映)${imgNote}`;
     } catch (e) {
       if (e instanceof Error) throw e;
       throw new Error('公開に失敗しました (接続を確認してください)');

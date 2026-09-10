@@ -11,7 +11,8 @@ import Constants from 'expo-constants';
  *   取得失敗時は同梱値にフォールバックする。
  * - 配信URLはビルド時定数 (`app.json` の `extra.contentUrl`、
  *   本番 `https://app.kinensai.jp/api/content`) で全端末共通。
- *   未設定 (空文字) の場合はリモート取得をせず、同梱値を使う。
+ *   Web静的exportでは extra が埋め込まれないためコード側既定値を持つ。
+ *   空文字の場合はリモート取得をせず、同梱値を使う。
  *
  * 管理者ページの変更を全世界へ反映する手順:
  *   1. `/admin/*` で内容を編集し、この端末のプレビューで確認する。
@@ -22,16 +23,23 @@ import Constants from 'expo-constants';
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 8000;
 
+/**
+ * 既定の配信ベースURL。Expo Web の静的exportでは
+ * `Constants.expoConfig.extra` がバンドルに埋め込まれないため、
+ * コード側の既定値を持つ (app.json の同名設定があればそちらを優先)。
+ */
+const DEFAULT_CONTENT_URL = 'https://app.kinensai.jp/api/content';
+
 const cache = new Map<string, { at: number; value: unknown }>();
 
-/** 全端末共通の配信ベースURL。未設定なら空文字。末尾スラッシュなしに正規化。 */
+/** 全端末共通の配信ベースURL。未設定なら既定値。末尾スラッシュなしに正規化。 */
 export function getContentUrl(): string {
   try {
     const extra = (Constants.expoConfig?.extra ?? {}) as { contentUrl?: unknown };
     const raw = typeof extra.contentUrl === 'string' ? extra.contentUrl.trim() : '';
-    return raw.replace(/\/+$/, '');
+    return (raw || DEFAULT_CONTENT_URL).replace(/\/+$/, '');
   } catch {
-    return '';
+    return DEFAULT_CONTENT_URL;
   }
 }
 

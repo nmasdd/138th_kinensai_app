@@ -5,6 +5,8 @@
  * - POST /api/admin/verify { token }    → 200 { ok:true } / 200 { ok:false }
  * - GET  /api/content/<name>.json       → KVから共有コンテンツを公開配信 (認証不要・5分キャッシュ)
  * - POST /api/content/publish { token, files: { name: value } } → 管理者トークンでKVへ公開
+ * - POST /api/images/upload { token, contentType, data(base64) } → 画像をKVへ格納し公開URLを返す
+ * - GET  /api/images/<key>                 → 画像を公開配信 (認証不要・長期キャッシュ)
  * - 上記以外 → ASSETS.fetch(request) (Expo Web の静的配信。SPAフォールバックは
  *   wrangler.toml の assets.not_found_handling に従う)
  *
@@ -19,8 +21,14 @@ interface AssetsBinding {
 }
 
 interface KvBinding {
-  get: (key: string, type: 'text') => Promise<string | null>;
-  put: (key: string, value: string) => Promise<void>;
+  get: {
+    (key: string, type: 'text'): Promise<string | null>;
+    (key: string, type: 'arrayBuffer'): Promise<ArrayBuffer | null>;
+  };
+  put: {
+    (key: string, value: string): Promise<void>;
+    (key: string, value: ArrayBuffer): Promise<void>;
+  };
   delete: (key: string) => Promise<void>;
 }
 
@@ -31,9 +39,29 @@ interface Env {
   ADMIN_SESSION_SECRET?: string;
 }
 
+/** Workers拡張のエッジキャッシュ (DOM libには無いため最小宣言)。 */
+declare const caches: {
+  default: {
+    match: (request: Request) => Promise<Response | undefined>;
+    put: (request: Request, response: Response) => Promise<void>;
+  };
+};
+
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 const MAX_FILE_BYTES = 1024 * 1024;
+/** 画像1枚の上限 (バイト)。base64受信なので余裕を見る。 */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** アップロード許可する画像形式と拡張子。 */
+const IMAGE_MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
+/** 画像キー形式 (KV列挙・パストラバーサル防止のため厳密に検証)。 */
+const IMAGE_KEY_RE = /^img-[a-z0-9]+\.(jpg|png|webp|gif)$/;
 
 /** 公開対象の共有コンテンツキー (/admin/data の公開バンドルと一致させる)。 */
 const CONTENT_KEYS = new Set([
@@ -132,14 +160,27 @@ function resetAttempts(ip: string, key: string): void {
   attempts.delete(`${key}:${ip}`);
 }
 
-async function readJsonBody(request: Request): Promise<unknown> {
+async function readBodyText(request: Request): Promise<string | null> {
   try {
-    const text = await request.text();
-    if (text.length > MAX_BODY_BYTES) return null;
-    return JSON.parse(text) as unknown;
+    return await request.text();
   } catch {
     return null;
   }
+}
+
+function safeParseJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+async function readJsonBody(request: Request): Promise<unknown> {
+  const text = await readBodyText(request);
+  if (text === null || text.length > MAX_BODY_BYTES) return null;
+  const parsed = safeParseJson(text);
+  return parsed === undefined ? null : parsed;
 }
 
 async function handleLogin(request: Request, env: Env): Promise<Response> {
@@ -191,6 +232,81 @@ async function handleContentGet(name: string, env: Env): Promise<Response> {
   });
 }
 
+function randomImageKey(ext: string): string {
+  const rand = [...crypto.getRandomValues(new Uint8Array(9))]
+    .map((b) => b.toString(36))
+    .join('')
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 12);
+  return `img-${Date.now().toString(36)}${rand}.${ext}`;
+}
+
+function base64ToBytes(data: string): Uint8Array | null {
+  if (!/^[A-Za-z0-9+/=]*$/.test(data) || data.length % 4 !== 0) return null;
+  try {
+    const bin = atob(data);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/** 画像の公開配信 (認証不要・長期キャッシュ)。 */
+async function handleImageGet(request: Request, key: string, env: Env): Promise<Response> {
+  if (!IMAGE_KEY_RE.test(key)) return json({ ok: false }, 404);
+  const cache = caches.default;
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  const buf = await env.CONTENT.get(key, 'arrayBuffer');
+  if (!buf) return json({ ok: false }, 404);
+  const ext = key.slice(key.lastIndexOf('.') + 1);
+  const mime =
+    ext === 'jpg' ? 'image/jpeg' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/gif';
+  const res = new Response(buf, {
+    headers: {
+      'content-type': mime,
+      'cache-control': 'public, max-age=31536000, immutable',
+    },
+  });
+  await cache.put(request, res.clone());
+  return res;
+}
+
+/** 画像のアップロード (管理者トークン必須)。R2の代わりにKVへ格納する。 */
+async function handleImageUpload(request: Request, env: Env): Promise<Response> {
+  const sessionSecret = env.ADMIN_SESSION_SECRET ?? '';
+  if (!sessionSecret) return json({ ok: false }, 500);
+  const ip = clientIp(request);
+  if (rateLimited(ip, 'imgupload', PUBLISH_ATTEMPT_LIMIT)) return json({ ok: false }, 429);
+
+  const rawUpload = await readBodyText(request);
+  if (rawUpload === null) return json({ ok: false }, 400);
+  if (rawUpload.length > MAX_BODY_BYTES) return json({ ok: false }, 413);
+  const body = safeParseJson(rawUpload);
+  const obj =
+    typeof body === 'object' && body !== null && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : null;
+  if (!obj) return json({ ok: false }, 400);
+  const token = String(obj.token ?? '');
+  if (!(await verifyAdminToken(token, sessionSecret))) return json({ ok: false }, 401);
+  const contentType = String(obj?.contentType ?? '');
+  const ext = IMAGE_MIME_TO_EXT[contentType];
+  const data = String(obj?.data ?? '');
+  if (!ext || !data) return json({ ok: false }, 400);
+  const bytes = base64ToBytes(data);
+  if (!bytes || bytes.byteLength === 0 || bytes.byteLength > MAX_IMAGE_BYTES) {
+    return json({ ok: false }, 413);
+  }
+  const key = randomImageKey(ext);
+  await env.CONTENT.put(key, bytes.buffer as ArrayBuffer);
+  resetAttempts(ip, 'imgupload');
+  const url = new URL(request.url);
+  return json({ ok: true, url: `${url.origin}/api/images/${key}`, key });
+}
+
 /** 共有コンテンツの公開 (管理者トークン必須)。files の値はそのまま各キーに保存する。 */
 async function handleContentPublish(request: Request, env: Env): Promise<Response> {
   const sessionSecret = env.ADMIN_SESSION_SECRET ?? '';
@@ -198,7 +314,10 @@ async function handleContentPublish(request: Request, env: Env): Promise<Respons
   const ip = clientIp(request);
   if (rateLimited(ip, 'publish', PUBLISH_ATTEMPT_LIMIT)) return json({ ok: false }, 429);
 
-  const body = await readJsonBody(request);
+  const rawPublish = await readBodyText(request);
+  if (rawPublish === null) return json({ ok: false }, 400);
+  if (rawPublish.length > MAX_BODY_BYTES) return json({ ok: false }, 413);
+  const body = safeParseJson(rawPublish);
   const token =
     typeof body === 'object' && body !== null && 'token' in body
       ? String((body as { token: unknown }).token ?? '')
@@ -248,6 +367,15 @@ export default {
     }
     if (request.method === 'POST' && url.pathname === '/api/content/publish') {
       return handleContentPublish(request, env);
+    }
+    if (request.method === 'POST' && url.pathname === '/api/images/upload') {
+      return handleImageUpload(request, env);
+    }
+    if (
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      url.pathname.startsWith('/api/images/')
+    ) {
+      return handleImageGet(request, url.pathname.slice('/api/images/'.length), env);
     }
     return env.ASSETS.fetch(request);
   },
