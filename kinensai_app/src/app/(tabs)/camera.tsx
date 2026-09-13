@@ -1,21 +1,46 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { M3Button, M3Card, M3EmptyState, M3Icon, M3LoadingView, TopAppBar } from '../../components/m3';
 import { ConfirmPop, ScanBeam, ScreenFade, SuccessCheck } from '../../components/anim';
+import { FLOOR_TOKENS, parseLocationQr } from '../../data/locationQr';
 import { m3, m3type } from '../../theme';
 
 export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState<string | null>(null);
   const [active, setActive] = useState(true);
+  // 同一読取で複数回イベントが来ても遷移を1回に抑える
+  const handledRef = useRef(false);
+
+  const location = scanned ? parseLocationQr(scanned) : null;
+
+  const locationParams = (parsed: NonNullable<ReturnType<typeof parseLocationQr>>): Record<string, string> => {
+    const params: Record<string, string> = { x: String(parsed.x), y: String(parsed.y) };
+    if (parsed.floorIndex >= 0) params.floor = FLOOR_TOKENS[parsed.floorIndex];
+    return params;
+  };
 
   const onScanned = (result: BarcodeScanningResult) => {
-    if (scanned) return;
+    if (handledRef.current || scanned) return;
+    const parsed = parseLocationQr(result.data);
+    handledRef.current = true;
     setScanned(result.data);
     setActive(false);
+    if (parsed) {
+      // アプリのマップの現在地QRなら確認を挟まず即座にマップへ遷移する
+      router.push({ pathname: '/map', params: locationParams(parsed) } as never);
+    }
+  };
+
+  const openInMap = () => {
+    if (location) {
+      router.push({ pathname: '/map', params: locationParams(location) } as never);
+      return;
+    }
+    router.push({ pathname: '/map', params: { loc: scanned ?? '' } } as never);
   };
 
   return (
@@ -47,18 +72,18 @@ export default function CameraScreen() {
             </SuccessCheck>
             <M3Card variant="elevated" style={styles.resultCard}>
               <Text style={[m3type.titleMedium, { color: m3.onSurface }]} accessibilityLiveRegion="polite">
-                QRを読み取りました
+                {location ? '現在地のQRコードを読み取りました' : 'QRを読み取りました'}
               </Text>
               <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 8 }]} numberOfLines={3}>
-                {scanned}
+                {location ? 'マップで現在地を確認できます。' : scanned}
               </Text>
             </M3Card>
             <View style={styles.resultActions}>
               <ConfirmPop key={scanned}>
                 <M3Button
-                  label="マップで現在地を見る"
+                  label={location ? 'マップで現在地を見る' : 'マップで関連企画を見る'}
                   icon="map"
-                  onPress={() => router.push({ pathname: '/map', params: { loc: scanned } } as never)}
+                  onPress={openInMap}
                 />
               </ConfirmPop>
               <M3Button
@@ -66,6 +91,7 @@ export default function CameraScreen() {
                 icon="qr-code-2"
                 variant="tonal"
                 onPress={() => {
+                  handledRef.current = false;
                   setScanned(null);
                   setActive(true);
                 }}

@@ -13,7 +13,7 @@ import { m3, m3type } from '../../theme';
  */
 
 interface AdminLink {
-  href: '/admin/class' | '/admin/volunteer' | '/admin/notifications' | '/admin/stage' | '/admin/picks' | '/admin/data';
+  href: '/admin/class' | '/admin/volunteer' | '/admin/notifications' | '/admin/stage' | '/admin/picks' | '/admin/qr' | '/admin/map' | '/admin/data';
   icon: IconName;
   title: string;
   sub: string;
@@ -25,6 +25,8 @@ const LINKS: AdminLink[] = [
   { href: '/admin/notifications', icon: 'notifications', title: '通知', sub: '通知の追加・削除' },
   { href: '/admin/stage', icon: 'mic', title: 'ステージ・講堂', sub: '出演団体・タイムテーブル・遅延・いま開催中・混雑' },
   { href: '/admin/picks', icon: 'star', title: 'おすすめ企画', sub: 'ホームに表示する企画の選択・並び替え' },
+  { href: '/admin/qr', icon: 'qr-code-2', title: '現在地QRコード', sub: '地図で地点を選んで廊下用のQRコードを作成' },
+  { href: '/admin/map', icon: 'map', title: 'マップ配置', sub: '部屋の位置・大きさ・名前を編集' },
   { href: '/admin/data', icon: 'storage', title: 'データ管理', sub: '全データの書き出し・取り込み (バックアップ・移行用)' },
 ];
 

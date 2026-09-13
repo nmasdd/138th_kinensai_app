@@ -31,6 +31,7 @@ export const SHARED_CONTENT_KEYS = [
   'timetable-overrides.json',
   'picks.json',
   'now-override.json',
+  'map-layout.json',
 ];
 
 function webStorage(): Storage | null {

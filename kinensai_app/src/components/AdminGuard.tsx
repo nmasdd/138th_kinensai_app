@@ -133,8 +133,20 @@ async function postAdminApi(path: string, payload: unknown): Promise<unknown | n
   }
 }
 
+/**
+ * 【一時設定】管理者ページのパスワード認証をスキップする。
+ * 動作確認用。公開前・本番デプロイ前に必ず false に戻すこと。
+ * false に戻すと通常のサーバ認証 (POST /api/admin/login) に戻る。
+ */
+const ADMIN_BYPASS_PASSWORD = true;
+
 /** 全 /admin/* ページをラップし、未認証ならパスワード入力を先に表示する。 */
 export function AdminGate({ children }: { children: React.ReactNode }) {
+  if (ADMIN_BYPASS_PASSWORD) return <>{children}</>;
+  return <AdminGateLocked>{children}</AdminGateLocked>;
+}
+
+function AdminGateLocked({ children }: { children: React.ReactNode }) {
   const unlocked = useSyncExternalStore(
     subscribeAdminAuth,
     getAdminAuthSnapshot,

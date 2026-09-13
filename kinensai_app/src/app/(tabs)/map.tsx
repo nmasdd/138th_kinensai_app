@@ -10,9 +10,23 @@ import { loadAllExhibitions, type Exhibition } from '../../data/exhibitions';
 import { useFavorites } from '../../data/favorites';
 import { hotspotForExhibitionId } from '../../data/mapHotspots';
 import { VECTOR_FLOORS, type VectorFloor } from '../../data/vectorMap';
+import { loadMapLayout, type MapLayoutOverrides } from '../../data/mapLayout';
 import { m3, m3shape, m3type } from '../../theme';
 
 const FLOOR_LABELS = VECTOR_FLOORS;
+
+function firstParam(v?: string | string[]): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
+/** "1"〜"5"/"1F" などの階指定を FLOOR_LABELS の index に変換する (4・5 は 4階5階) */
+function floorParamToIndex(v?: string): number {
+  if (!v) return -1;
+  const m = v.normalize('NFKC').match(/[1-5]/);
+  if (!m) return -1;
+  const n = parseInt(m[0], 10);
+  return n <= 1 ? 0 : n === 2 ? 1 : n === 3 ? 2 : 3;
+}
 
 /**
  * クラス名トークンからフロア番号を求める。
@@ -50,10 +64,16 @@ function floorIndexForExhibition(ex: Exhibition): number {
 }
 
 export default function MapScreen() {
-  const { loc } = useLocalSearchParams<{ loc?: string }>();
+  const { loc, floor: floorParam, x: xParam, y: yParam } = useLocalSearchParams<{
+    loc?: string;
+    floor?: string;
+    x?: string;
+    y?: string;
+  }>();
   const [tab, setTab] = useState(0);
   const [query, setQuery] = useState('');
   const [exhibitions, setExhibitions] = useState<Exhibition[]>([]);
+  const [mapLayout, setMapLayout] = useState<MapLayoutOverrides>({});
   const [isLoading, setIsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -63,6 +83,22 @@ export default function MapScreen() {
   const blinkAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const [blinkId, setBlinkId] = useState<string | null>(null);
   const mountedRef = useRef(true);
+  const appliedFloorRef = useRef<string | null>(null);
+
+  const floorParamRaw = firstParam(floorParam);
+  const floorIndexFromParam = floorParamToIndex(floorParamRaw);
+
+  // 現在地 (URL の x,y)。0〜1 は相対座標、1より大きい値は 1000x700 の
+  // ワールド座標として扱い、VectorMapView へは相対座標で渡す。
+  const selfRel = useMemo(() => {
+    const x = parseFloat(firstParam(xParam) ?? '');
+    const y = parseFloat(firstParam(yParam) ?? '');
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    const rx = x >= 0 && x <= 1 ? x : x / 1000;
+    const ry = y >= 0 && y <= 1 ? y : y / 700;
+    if (rx < 0 || rx > 1 || ry < 0 || ry > 1) return null;
+    return { x: rx, y: ry };
+  }, [xParam, yParam]);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -75,6 +111,16 @@ export default function MapScreen() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      // URL で階が指定されていれば、その階へ切り替える (手動切替は尊重)
+      if (floorIndexFromParam >= 0 && appliedFloorRef.current !== floorParamRaw) {
+        appliedFloorRef.current = floorParamRaw ?? null;
+        setTab(floorIndexFromParam);
+      }
+      loadMapLayout()
+        .then((layout) => {
+          if (!cancelled) setMapLayout(layout);
+        })
+        .catch(() => {});
       loadAllExhibitions()
         .catch(() => [])
         .then((list) => {
@@ -91,7 +137,7 @@ export default function MapScreen() {
       return () => {
         cancelled = true;
       };
-    }, [loc]),
+    }, [loc, floorIndexFromParam, floorParamRaw]),
   );
 
   const selected = exhibitions.find((e) => e.id === selectedId) ?? null;
@@ -175,6 +221,8 @@ export default function MapScreen() {
             blinkId={blinkId}
             blinkAnim={blinkAnim}
             locId={locExhibition?.id ?? locText}
+            selfPos={selfRel && (floorIndexFromParam < 0 || floorIndexFromParam === tab) ? selfRel : null}
+            roomsOverride={mapLayout[floor]}
             onSelect={selectHotspot}
           />
         </ScreenFade>
@@ -186,6 +234,16 @@ export default function MapScreen() {
             <View style={styles.locBanner} accessibilityLiveRegion="polite">
               <Text style={[m3type.bodyMedium, { color: m3.onPrimaryContainer, textAlign: 'center' }]}>
                 QR読取位置: {selected ? `${selected.className}付近` : locText}
+              </Text>
+            </View>
+          </Rise>
+        )}
+        {selfRel && (
+          <Rise>
+            <View style={[styles.locBanner, styles.selfBanner]} accessibilityLiveRegion="polite">
+              <M3Icon name="my-location" size={16} color={m3.onPrimaryContainer} />
+              <Text style={[m3type.bodyMedium, { color: m3.onPrimaryContainer }]}>
+                現在地: {FLOOR_LABELS[floorIndexFromParam >= 0 ? floorIndexFromParam : tab]} 付近
               </Text>
             </View>
           </Rise>
@@ -268,6 +326,7 @@ const styles = StyleSheet.create({
   hint: { color: m3.onSurfaceVariant, textAlign: 'center' },
   coLocatedLink: { color: m3.primary, marginTop: 8 },
   locBanner: { backgroundColor: m3.primaryContainer, borderRadius: m3shape.card, padding: 12 },
+  selfBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   detailBox: { backgroundColor: m3.surfaceContainerHigh, borderRadius: m3shape.dialog, padding: 20, minHeight: 200 },
   detailLink: { color: m3.primary, marginTop: 8 },
   place: {

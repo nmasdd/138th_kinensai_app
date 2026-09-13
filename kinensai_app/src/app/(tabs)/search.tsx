@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { M3Card, M3EmptyState, M3FAB, M3FilterChip, M3Icon, M3ImagePlaceholder, M3LoadingView, M3SearchBar, TopAppBar } from '../../components/m3';
 import { Rise, ScreenFade, Stagger } from '../../components/anim';
 import ExhibitionDetailModal from '../../components/ExhibitionDetailModal';
@@ -34,11 +34,16 @@ export default function SearchScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const { isFavorite, toggle } = useFavorites();
 
+  // 詳細直開きの自動オープンは「未オープンの target」に一度だけ行う。
+  // 画面に再フォーカスしたらリセットし、再訪時は同じ target でも開き直せるようにする。
+  const openedExhibitRef = useRef<string | null>(null);
+
   // 管理者ページの保存を即反映するため、表示のたびに再読込する
   // QuickNav/メニューからの再訪でも filter/exhibit を同期する
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      openedExhibitRef.current = null;
       if (filter === 'mogiten') {
         setKind('mogiten');
         setFilterOpen(true);
@@ -95,13 +100,12 @@ export default function SearchScreen() {
   }, [filtered, kind, isFavorite]);
 
   // 他画面からの詳細直開き: /search?exhibit=<id> で一致があれば自動で開く
-  // 再訪時も開けるよう、同一targetはモーダルが閉じていれば再オープンする
-  const openedExhibitRef = useRef<string | null>(null);
+  // modalVisible を依存に含めないことで、閉じた直後の再オープンを防ぐ
   useEffect(() => {
     if (isLoading) return;
     const target = Array.isArray(exhibit) ? exhibit[0] : exhibit;
     if (!target) return;
-    if (openedExhibitRef.current === target && modalVisible) return;
+    if (openedExhibitRef.current === target) return;
     if (!exhibitions.some((ex) => ex.id === target)) return;
     openedExhibitRef.current = target;
     // effect 本体での同期 setState を避けるため遅延実行する
@@ -110,7 +114,7 @@ export default function SearchScreen() {
       setModalVisible(true);
     }, 0);
     return () => clearTimeout(timer);
-  }, [exhibit, exhibitions, isLoading, modalVisible]);
+  }, [exhibit, exhibitions, isLoading]);
 
   if (isLoading) {
     return (
@@ -202,6 +206,8 @@ export default function SearchScreen() {
         onClose={() => {
           setModalVisible(false);
           setSelectedId(null);
+          // 直開き用パラメータを除去し /search に戻す
+          if (exhibit) router.setParams({ exhibit: undefined });
         }}
       />
     </SafeAreaView>

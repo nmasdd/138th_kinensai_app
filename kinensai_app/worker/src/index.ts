@@ -76,6 +76,7 @@ const CONTENT_KEYS = new Set([
   'timetable-overrides.json',
   'picks.json',
   'now-override.json',
+  'map-layout.json',
 ]);
 
 /** isolate内ベストエフォートの総当たり対策 (分散環境では完全ではない)。 */

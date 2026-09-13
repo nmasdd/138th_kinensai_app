@@ -30,6 +30,7 @@ import {
 } from '../../data/timetable';
 import { loadCongestion, saveCongestion, type CongestionLevel } from '../../data/congestion';
 import { saveStageGroups, type StageGroup } from '../../data/stage';
+import { loadMapLayout, saveMapLayout, type MapLayoutOverrides } from '../../data/mapLayout';
 import { SHARED_CONTENT_KEYS, clearLocalKey, loadJSON } from '../../data/kvStore';
 import { clearRemoteCache, getContentUrl, isRemoteContentConfigured } from '../../data/remoteConfig';
 import { rewriteImagesForPublish } from '../../data/imageUpload';
@@ -59,7 +60,7 @@ function AdminDataContent() {
 
   const exportAll = async (): Promise<string> => {
     try {
-      const [overrides, customClasses, vols, ticketMap, notifs, delayMap, ttOverrides, level, stageGroups] =
+      const [overrides, customClasses, vols, ticketMap, notifs, delayMap, ttOverrides, level, stageGroups, mapLayout] =
         await Promise.all([
           loadClassOverrides(),
           loadCustomClasses(),
@@ -70,6 +71,7 @@ function AdminDataContent() {
           loadTimetableOverrides(),
           loadCongestion(),
           loadJSON<unknown>('stage-groups.json', null),
+          loadMapLayout(),
         ]);
       setIoText(
         JSON.stringify(
@@ -83,6 +85,7 @@ function AdminDataContent() {
             congestion: level,
             delays: delayMap,
             timetableOverrides: ttOverrides,
+            mapLayout,
           },
           null,
           2,
@@ -105,6 +108,7 @@ function AdminDataContent() {
         congestion?: CongestionLevel;
         delays?: Record<string, number>;
         timetableOverrides?: { added?: StageItem[]; edited?: Record<string, Partial<StageItem>>; deleted?: string[] };
+        mapLayout?: MapLayoutOverrides;
       };
       if (parsed.classOverrides) await saveClassOverrides(parsed.classOverrides);
       if (Array.isArray(parsed.customClasses)) await saveCustomClasses(parsed.customClasses);
@@ -124,6 +128,7 @@ function AdminDataContent() {
           deleted: Array.isArray(parsed.timetableOverrides.deleted) ? parsed.timetableOverrides.deleted : [],
         });
       }
+      if (parsed.mapLayout) await saveMapLayout(parsed.mapLayout);
       return 'データを取り込みました';
     } catch {
       throw new Error('取り込みに失敗しました (JSONを確認してください)');
@@ -148,6 +153,7 @@ function AdminDataContent() {
       loadTimetableOverrides().then((v) => ['timetable-overrides.json', v] as [string, unknown]),
       loadJSON<unknown>('picks.json', null).then((v) => ['picks.json', v] as [string, unknown]),
       loadJSON<unknown>('now-override.json', null).then((v) => ['now-override.json', v] as [string, unknown]),
+      loadMapLayout().then((v) => ['map-layout.json', v] as [string, unknown]),
     ]);
 
   /**

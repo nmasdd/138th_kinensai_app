@@ -11,6 +11,18 @@ import { loadAllExhibitions, type Exhibition } from '../../data/exhibitions';
 import { loadPickIds } from '../../data/picks';
 import { loadAuditorium, findNow, type StageItem } from '../../data/timetable';
 
+const PICK_COUNT = 2;
+
+/** 配列から重複なく count 件をランダムに選ぶ (Fisher–Yates)。 */
+function sampleRandom<T>(items: T[], count: number): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, count);
+}
+
 export default function HomeScreen() {
   const [picks, setPicks] = useState<Exhibition[]>([]);
   const [nowItem, setNowItem] = useState<StageItem | null>(null);
@@ -26,10 +38,12 @@ export default function HomeScreen() {
         loadPickIds().catch(() => [] as string[]),
       ]).then(([exhibitions, auditorium, pickIds]) => {
         if (cancelled) return;
-        // 管理者おすすめがあれば選択順に表示し、未設定時はカタログ先頭2件を使う
+        // 管理者おすすめがあればそれを対象に、未設定なら全企画から
+        // 表示のたびにランダムで PICK_COUNT 件を選ぶ。
         const byId = new Map(exhibitions.map((e) => [e.id, e]));
         const ordered = pickIds.map((id) => byId.get(id)).filter((e): e is Exhibition => !!e);
-        setPicks(ordered.length > 0 ? ordered : exhibitions.slice(0, 2));
+        const pool = ordered.length > 0 ? ordered : exhibitions;
+        setPicks(sampleRandom(pool, PICK_COUNT));
         setNowItem(findNow(auditorium, new Date()));
         setIsLoading(false);
       });
@@ -89,7 +103,7 @@ export default function HomeScreen() {
 
         <Rise delay={120}>
           <M3Card variant="filled">
-          <Text style={[m3type.titleMedium, { color: m3.onSurface }]}>おすすめ企画</Text>
+          <Text style={[m3type.titleMedium, { color: m3.onSurface }]}>おすすめ企画（ランダム{PICK_COUNT}件）</Text>
           {picks.length === 0 && !isLoading ? (
             <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 8 }]}>
               おすすめ企画は準備中です
