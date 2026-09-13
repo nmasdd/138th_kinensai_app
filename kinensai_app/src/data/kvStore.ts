@@ -26,6 +26,7 @@ export const SHARED_CONTENT_KEYS = [
   'tickets.json',
   'notifications.json',
   'stage-groups.json',
+  'auditorium-groups.json',
   'congestion.json',
   'delays.json',
   'timetable-overrides.json',

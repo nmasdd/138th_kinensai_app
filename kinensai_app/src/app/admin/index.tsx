@@ -4,8 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { M3Button, M3ListItem, M3SearchBar, TopAppBar, goBackOrHome, type IconName } from '../../components/m3';
 import { AdminPublishNote, AdminGate } from '../../components/AdminGuard';
-import { adminStyles } from '../../components/adminUi';
-import { m3, m3type } from '../../theme';
+import { useAdminStyles } from '../../components/adminUi';
+import { m3 } from '../../theme';
+import { useM3 } from '../../context/responsive';
 
 /**
  * 管理者用目次 (/admin)。直接アクセス専用でタブ・メニューに入口は置かない。
@@ -39,6 +40,8 @@ export default function AdminIndexScreen() {
 }
 
 function AdminIndexContent() {
+  const { type } = useM3();
+  const adminStyles = useAdminStyles();
   const [query, setQuery] = useState('');
 
   const visible = useMemo(() => {
@@ -51,7 +54,7 @@ function AdminIndexContent() {
     <SafeAreaView style={adminStyles.container} edges={['top']}>
       <TopAppBar title="管理者用" />
       <ScrollView contentContainerStyle={adminStyles.body}>
-        <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>
+        <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
           /admin の直接アクセス専用ページです。各画面の保存はこの端末のプレビューとして即反映されます。全世界へ反映するには「データ管理」の公開手順を使ってください。
         </Text>
         <AdminPublishNote />
@@ -69,7 +72,7 @@ function AdminIndexContent() {
           />
         ))}
         {visible.length === 0 ? (
-          <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>一致するメニューはありません</Text>
+          <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>一致するメニューはありません</Text>
         ) : null}
         <View style={adminStyles.backWrap}>
           <M3Button label="戻る" icon="undo" onPress={() => goBackOrHome()} />

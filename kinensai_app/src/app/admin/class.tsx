@@ -10,7 +10,7 @@ import {
   adminErrorMessage,
   useAdminNotice,
 } from '../../components/AdminSaveBar';
-import { Chips, Field, ImageField, Section, adminStyles, type TicketState } from '../../components/adminUi';
+import { Chips, Field, ImageField, Section, useAdminStyles, type TicketState } from '../../components/adminUi';
 import { AdminGate } from '../../components/AdminGuard';
 import {
   loadAllExhibitions,
@@ -24,7 +24,8 @@ import {
 } from '../../data/exhibitions';
 import { loadTicketMap, saveTicketMap, type TicketInfo } from '../../data/tickets';
 import { deleteStoredImage } from '../../data/images';
-import { m3, m3type } from '../../theme';
+import { m3 } from '../../theme';
+import { useM3 } from '../../context/responsive';
 
 /**
  * 管理者用・クラス企画 (/admin/class)。
@@ -52,6 +53,8 @@ export default function AdminClassScreen() {
 }
 
 function AdminClassContent() {
+  const { type } = useM3();
+  const adminStyles = useAdminStyles();
   const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [classes, setClasses] = useState<ClassDraft[]>([]);
@@ -198,13 +201,13 @@ function AdminClassContent() {
             <M3SearchBar value={query} onChangeText={setQuery} placeholder="クラス企画を検索" />
           </View>
           <Section title="クラス企画 (タイトル・説明・場所・整理券)">
-            <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, marginBottom: 8 }]}>
+            <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginBottom: 8 }]}>
               カタログ由来の企画は削除できません。追加したカスタム企画のみ削除できます。
             </Text>
             {visibleClasses.map((c) => (
               <View key={c.id} style={adminStyles.block}>
                 <View style={adminStyles.blockHeader}>
-                  <Text style={[m3type.titleSmall, { color: m3.onSurface }]}>
+                  <Text style={[type.titleSmall, { color: m3.onSurface }]}>
                     {c.id}
                     {c.isCustom ? ' (カスタム)' : ''}
                   </Text>
@@ -216,7 +219,7 @@ function AdminClassContent() {
                         deleteCustomClass(c.id).then(showOk).catch((e) => showErr(adminErrorMessage(e)));
                       }}
                     >
-                      <Text style={[m3type.labelLarge, adminStyles.danger]}>削除</Text>
+                      <Text style={[type.labelLarge, adminStyles.danger]}>削除</Text>
                     </M3Touch>
                   ) : null}
                 </View>
@@ -281,10 +284,10 @@ function AdminClassContent() {
               </View>
             ))}
             {visibleClasses.length === 0 ? (
-              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>一致する企画はありません</Text>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>一致する企画はありません</Text>
             ) : null}
             <View style={adminStyles.block}>
-              <Text style={[m3type.titleSmall, { color: m3.onSurface }]}>新規追加 (idはクラス名から自動採番)</Text>
+              <Text style={[type.titleSmall, { color: m3.onSurface }]}>新規追加 (idはクラス名から自動採番)</Text>
               <Field label="クラス名">
                 <TextInput
                   style={adminStyles.input}

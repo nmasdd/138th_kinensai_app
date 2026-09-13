@@ -1,34 +1,36 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { M3Button, M3Card, M3EmptyState, M3ImagePlaceholder, M3LoadingView, TopAppBar, goBackOrHome } from '../components/m3';
 import { Stagger } from '../components/anim';
 import { loadNotifications, type AppNotification } from '../data/notifications';
-import { m3, m3type } from '../theme';
+import { useContentEffect } from '../context/useContentRefreshKey';
+import { m3, scaled } from '../theme';
+import { useM3 } from '../context/responsive';
 
 export default function NotificationsScreen() {
+  const { type } = useM3();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 管理者ページの保存を即反映するため、表示のたびに再読込する
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      loadNotifications()
-        .catch(() => [])
-        .then((list) => {
-          if (!cancelled) setItems(list);
-        })
-        .finally(() => {
-          if (!cancelled) setIsLoading(false);
-        });
-      return () => {
-        cancelled = true;
-      };
-    }, []),
-  );
+  // 管理者ページの保存・公開コンテンツの更新を即反映する
+  useContentEffect(() => {
+    let cancelled = false;
+    loadNotifications()
+      .catch(() => [])
+      .then((list) => {
+        if (!cancelled) setItems(list);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  });
 
   if (isLoading) {
     return (
@@ -55,19 +57,19 @@ export default function NotificationsScreen() {
               <M3ImagePlaceholder height={140} />
             )}
             <View style={styles.cardBody}>
-              <Text style={[m3type.labelMedium, { color: m3.onSurfaceVariant }]}>{item.date}</Text>
-              <Text style={[m3type.titleMedium, { color: m3.onSurface, marginTop: 2 }]}>{item.title}</Text>
-              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 4 }]} numberOfLines={2}>
+              <Text style={[type.labelMedium, { color: m3.onSurfaceVariant }]}>{item.date}</Text>
+              <Text style={[type.titleMedium, { color: m3.onSurface, marginTop: 2 }]}>{item.title}</Text>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 4 }]} numberOfLines={2}>
                 {item.body}
               </Text>
-              <Text style={[m3type.labelLarge, styles.detailHint]}>詳細を開く</Text>
+              <Text style={[type.labelLarge, styles.detailHint]}>詳細を開く</Text>
             </View>
           </M3Card>
           </Stagger>
         )}
         ListEmptyComponent={
           <M3EmptyState icon="notifications">
-            <Text style={[m3type.bodyLarge, { color: m3.onSurfaceVariant }]}>通知はありません</Text>
+            <Text style={[type.bodyLarge, { color: m3.onSurfaceVariant }]}>通知はありません</Text>
           </M3EmptyState>
         }
       />
@@ -78,12 +80,19 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: m3.surface },
-  list: { padding: 16, gap: 16, paddingBottom: 24 },
-  card: { padding: 0 },
-  image: { width: '100%', height: 140 },
-  cardBody: { padding: 16, gap: 4 },
-  detailHint: { color: m3.primary, marginTop: 8 },
-  backWrap: { alignItems: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
-});
+function createStyles(s: number) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: m3.surface },
+    list: { padding: scaled(16, s), gap: scaled(16, s), paddingBottom: scaled(24, s) },
+    card: { padding: 0 },
+    image: { width: '100%', height: scaled(140, s) },
+    cardBody: { padding: scaled(16, s), gap: scaled(4, s) },
+    detailHint: { color: m3.primary, marginTop: scaled(8, s) },
+    backWrap: { alignItems: 'flex-end', paddingHorizontal: scaled(16, s), paddingBottom: scaled(16, s) },
+  });
+}
+
+function useStyles() {
+  const { scale } = useM3();
+  return React.useMemo(() => createStyles(scale), [scale]);
+}

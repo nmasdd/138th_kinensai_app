@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   AccessibilityRole,
   ActivityIndicator,
-  Animated,
   Platform,
   Pressable,
   StyleSheet,
@@ -16,11 +15,24 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { m3, m3layout, m3shape, m3type } from '../theme';
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
+import { m3, scaled, type M3Shape } from '../theme';
+import { useM3 } from '../context/responsive';
 
 export type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
-/** リップル + 軽い縮小フィードバック付きのタップ面 */
+const PRESS_SCALE = 0.96;
+
+/**
+ * リップル付きのタップ面。押下時にわずかに沈み込み、
+ * 指を離すと自然なスプリングで戻る (HIG: 操作フィードバック)。
+ * Reduce Motion 時はスケールせずリップルのみ。
+ */
 export function M3Touch({
   children,
   onPress,
@@ -36,28 +48,45 @@ export function M3Touch({
   label?: string;
   role?: AccessibilityRole;
 }) {
-  const [scale] = useState(() => new Animated.Value(1));
+  const styles = useStyles();
+  const reduced = useReducedMotion();
+  const scale = useSharedValue(1);
+
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  const pressIn = () => {
+    if (reduced) return;
+    scale.set(withSpring(PRESS_SCALE, { damping: 20, stiffness: 400, mass: 0.5 }));
+  };
+  const pressOut = () => {
+    if (reduced) return;
+    scale.set(withSpring(1, { damping: 16, stiffness: 300, mass: 0.6 }));
+  };
+
   return (
     <Pressable
       accessibilityLabel={label}
       accessibilityRole={role}
       android_ripple={{ color: 'rgba(0,0,0,0.12)', borderless: false }}
       onPress={onPress}
-      onPressIn={() => Animated.timing(scale, { toValue: 0.97, duration: 90, useNativeDriver: true }).start()}
-      onPressOut={() => Animated.timing(scale, { toValue: 1, duration: 120, useNativeDriver: true }).start()}
+      onPressIn={pressIn}
+      onPressOut={pressOut}
       style={[round && styles.roundClip, style]}
     >
-      <Animated.View style={[{ transform: [{ scale }] }]}>{children}</Animated.View>
+      <Animated.View style={anim}>{children}</Animated.View>
     </Pressable>
   );
 }
 
 export function M3Icon({ name, size = 24, color = m3.onSurface }: { name: IconName; size?: number; color?: string }) {
-  return <MaterialIcons name={name} size={size} color={color} />;
+  const { scale } = useM3();
+  return <MaterialIcons name={name} size={scaled(size, scale)} color={color} />;
 }
 
 /** 高さ 64 のスモールトップアプリバー。左 menu→メニュー、右 notifications→通知。 */
 export function TopAppBar({ title }: { title: string }) {
+  const styles = useStyles();
+  const { type } = useM3();
   return (
     <View style={styles.appBar} accessibilityRole="header">
       <Pressable
@@ -69,7 +98,7 @@ export function TopAppBar({ title }: { title: string }) {
       >
         <M3Icon name="menu" />
       </Pressable>
-      <Text style={[m3type.titleLarge, styles.appBarTitle]} numberOfLines={1}>
+      <Text style={[type.titleLarge, styles.appBarTitle]} numberOfLines={1}>
         {title}
       </Text>
       <Pressable
@@ -101,6 +130,8 @@ export function M3Button({
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }) {
+  const styles = useStyles();
+  const { type } = useM3();
   const bg =
     variant === 'filled' ? m3.primary : variant === 'tonal' ? m3.secondaryContainer : 'transparent';
   const fg =
@@ -109,7 +140,7 @@ export function M3Button({
     <M3Touch onPress={onPress} label={label} round>
       <View style={[styles.button, { backgroundColor: bg }, variant === 'outlined' && styles.buttonOutlined, style]}>
         {icon && <M3Icon name={icon} size={20} color={fg} />}
-        <Text style={[m3type.labelLarge, { color: fg, flexShrink: 1 }]} numberOfLines={1}>
+        <Text style={[type.labelLarge, { color: fg, flexShrink: 1 }]} numberOfLines={1}>
           {label}
         </Text>
       </View>
@@ -127,6 +158,7 @@ export function M3SearchBar({
   onChangeText: (t: string) => void;
   placeholder?: string;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.searchBar}>
       <M3Icon name="search" color={m3.onSurfaceVariant} />
@@ -177,6 +209,7 @@ export function M3Card({
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }) {
+  const styles = useStyles();
   const inner = (
     <View
       style={[
@@ -201,8 +234,10 @@ export function M3Card({
 
 /** 画像領域のプレースホルダー (image アイコン付き)。 */
 export function M3ImagePlaceholder({ height = 140 }: { height?: number }) {
+  const styles = useStyles();
+  const { scale } = useM3();
   return (
-    <View style={[styles.imagePh, { height }]}>
+    <View style={[styles.imagePh, { height: scaled(height, scale) }]}>
       <M3Icon name="image" size={40} color={m3.onSurfaceVariant} />
     </View>
   );
@@ -222,13 +257,15 @@ export function M3FAB({
   small?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  const size = small ? 48 : 56;
+  const styles = useStyles();
+  const { scale, shape } = useM3();
+  const size = scaled(small ? 48 : 56, scale);
   return (
     <M3Touch onPress={onPress} label={label} round>
       <View
         style={[
           styles.fab,
-          { width: size, height: size, borderRadius: small ? m3shape.fabSmall : m3shape.fab, backgroundColor: m3.primaryContainer },
+          { width: size, height: size, borderRadius: small ? shape.fabSmall : shape.fab, backgroundColor: m3.primaryContainer },
           style,
         ]}
       >
@@ -250,6 +287,7 @@ export function M3IconButton({
   label?: string;
   selected?: boolean;
 }) {
+  const styles = useStyles();
   return (
     <M3Touch onPress={onPress} label={label} round>
       <View
@@ -264,7 +302,7 @@ export function M3IconButton({
   );
 }
 
-/** M3 プライマリタブ。高さ 48、選択中は primary 文字 + ラベル幅 3dp インジケータ。 */
+/** M3 プライマリタブ。高さ 56、選択中は primary 文字 + ラベル幅 3dp インジケータ。 */
 export function M3PrimaryTabs({
   labels,
   value,
@@ -274,14 +312,19 @@ export function M3PrimaryTabs({
   value: number;
   onValueChange: (i: number) => void;
 }) {
+  const styles = useStyles();
+  const { type } = useM3();
   return (
     <View style={styles.tabs}>
       {labels.map((label, i) => {
         const active = i === value;
         return (
-          <M3Touch key={label} onPress={() => onValueChange(i)} label={label} role="tab">
+          <M3Touch key={label} onPress={() => onValueChange(i)} label={label} role="tab" style={styles.tabItem}>
             <View style={styles.tab} accessibilityState={{ selected: active }}>
-              <Text style={[m3type.titleSmall, { color: active ? m3.primary : m3.onSurfaceVariant }]}>
+              <Text
+                numberOfLines={1}
+                style={[type.titleMedium, { color: active ? m3.primary : m3.onSurfaceVariant }]}
+              >
                 {label}
               </Text>
               <View style={[styles.tabIndicator, active && { backgroundColor: m3.primary }]} />
@@ -309,13 +352,15 @@ export function M3ListItem({
   onPress?: () => void;
   position?: ListPosition;
 }) {
+  const styles = useStyles();
+  const { type, shape } = useM3();
   const radius: ViewStyle =
     position === 'single'
-      ? { borderRadius: m3shape.dialog }
+      ? { borderRadius: shape.dialog }
       : position === 'top'
-        ? { borderTopLeftRadius: m3shape.dialog, borderTopRightRadius: m3shape.dialog, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }
+        ? { borderTopLeftRadius: shape.dialog, borderTopRightRadius: shape.dialog, borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }
         : position === 'bottom'
-          ? { borderTopLeftRadius: 8, borderTopRightRadius: 8, borderBottomLeftRadius: m3shape.dialog, borderBottomRightRadius: m3shape.dialog }
+          ? { borderTopLeftRadius: 8, borderTopRightRadius: 8, borderBottomLeftRadius: shape.dialog, borderBottomRightRadius: shape.dialog }
           : { borderRadius: 8 };
   return (
     <M3Touch onPress={onPress} label={title} round>
@@ -324,11 +369,11 @@ export function M3ListItem({
           <M3Icon name={icon} color={m3.onPrimaryContainer} />
         </View>
         <View style={styles.listText}>
-          <Text style={[m3type.bodyLarge, { color: m3.onSurface }]} numberOfLines={1}>
+          <Text style={[type.bodyLarge, { color: m3.onSurface }]} numberOfLines={1}>
             {title}
           </Text>
           {sub ? (
-            <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={2}>
+            <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={2}>
               {sub}
             </Text>
           ) : null}
@@ -342,6 +387,7 @@ const textBase: TextStyle = {};
 
 /** 中央寄せのローディング表示。見出しや説明は呼び出し側の既存文言を使う。 */
 export function M3LoadingView() {
+  const styles = useStyles();
   return (
     <View style={styles.loadingView}>
       <ActivityIndicator size="large" color={m3.primary} />
@@ -351,6 +397,7 @@ export function M3LoadingView() {
 
 /** 中央寄せの空状態表示。アイコン + 呼び出し側の既存文言を並べる。 */
 export function M3EmptyState({ icon, children }: { icon: IconName; children: React.ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.emptyState}>
       <View style={styles.emptyIcon}>
@@ -362,7 +409,8 @@ export function M3EmptyState({ icon, children }: { icon: IconName; children: Rea
 }
 
 export function M3Headline({ children, style }: { children: React.ReactNode; style?: StyleProp<TextStyle> }) {
-  return <Text style={[m3type.headlineMedium, { color: m3.onSurface }, textBase, style]}>{children}</Text>;
+  const { type } = useM3();
+  return <Text style={[type.headlineMedium, { color: m3.onSurface }, textBase, style]}>{children}</Text>;
 }
 
 /**
@@ -391,9 +439,11 @@ export function M3Divider({ style }: { style?: StyleProp<ViewStyle> }) {
 
 /** M3 バッジ (開催中・投票中などの状態表示)。 */
 export function M3Badge({ label }: { label: string }) {
+  const styles = useStyles();
+  const { type } = useM3();
   return (
     <View style={styles.badge}>
-      <Text style={[m3type.labelMedium, { color: m3.onPrimary }]}>{label}</Text>
+      <Text style={[type.labelMedium, { color: m3.onPrimary }]}>{label}</Text>
     </View>
   );
 }
@@ -408,13 +458,15 @@ export function M3FilterChip({
   selected: boolean;
   onPress: () => void;
 }) {
+  const styles = useStyles();
+  const { type } = useM3();
   return (
     <M3Touch onPress={onPress} label={label} role="button" round>
       <View
         style={[styles.chip, selected && styles.chipActive]}
         accessibilityState={{ selected }}
       >
-        <Text style={[m3type.labelLarge, { color: selected ? m3.onSecondaryContainer : m3.onSurfaceVariant }]}>
+        <Text style={[type.labelLarge, { color: selected ? m3.onSecondaryContainer : m3.onSurfaceVariant }]}>
           {label}
         </Text>
       </View>
@@ -422,103 +474,142 @@ export function M3FilterChip({
   );
 }
 
-const styles = StyleSheet.create({
-  roundClip: { borderRadius: m3shape.pill },
-  appBar: {
-    height: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: m3.surface,
-    paddingHorizontal: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: m3.outlineVariant,
-  },
-  appBarIcon: { width: 48, height: 48, justifyContent: 'center', alignItems: 'center', borderRadius: 24 },
-  appBarTitle: { flex: 1, textAlign: 'center', color: m3.onSurface },
-  button: {
-    minHeight: 56,
-    borderRadius: m3shape.pill,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 8,
-    minWidth: 0,
-  },
-  buttonOutlined: { borderWidth: 1, borderColor: m3.outline },
-  searchBar: {
-    height: 56,
-    borderRadius: m3shape.pill,
-    backgroundColor: m3.surfaceContainerHigh,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 16,
-  },
-  searchInput: { flex: 1, fontSize: 16, color: m3.onSurface, paddingVertical: 8 },
-  searchAction: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  card: { borderRadius: m3shape.card, padding: 16, overflow: 'hidden' },
-  cardShadow: {
-    elevation: 1,
-    boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-  },
-  imagePh: {
-    backgroundColor: m3.surfaceContainerHighest,
-    borderRadius: m3shape.card,
-    borderWidth: 1,
-    borderColor: m3.outlineVariant,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fab: { justifyContent: 'center', alignItems: 'center', elevation: 3, boxShadow: '0 2px 6px rgba(0,0,0,0.3)' },
-  tonalIcon: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: m3.outlineVariant, backgroundColor: m3.surface },
-  tab: { flex: 1, height: 48, justifyContent: 'flex-end', alignItems: 'center' },
-  tabIndicator: { height: 3, width: 48, borderTopLeftRadius: 3, borderTopRightRadius: 3, marginTop: 6 },
-  listItem: {
-    minHeight: 72,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: m3.surfaceContainerLow,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 16,
-    marginBottom: 3,
-  },
-  listIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: m3.primaryContainer,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listText: { flex: 1, gap: 2 },
-  badge: {
-    backgroundColor: m3.primary,
-    borderRadius: m3shape.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  chip: {
-    minHeight: m3layout.touchMin,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: m3shape.pill,
-    borderWidth: 1,
-    borderColor: m3.outline,
-  },
-  chipActive: { backgroundColor: m3.secondaryContainer, borderColor: m3.secondaryContainer },
-  loadingView: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  emptyState: { paddingTop: 60, paddingHorizontal: 24, alignItems: 'center', gap: 12 },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: m3.surfaceContainerHigh,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
+/** 画面幅の倍率 s に応じたスタイルを生成する。 */
+function createStyles(s: number, shape: M3Shape) {
+  return StyleSheet.create({
+    roundClip: { borderRadius: shape.pill },
+    appBar: {
+      height: scaled(64, s),
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: m3.surface,
+      paddingHorizontal: scaled(4, s),
+      borderBottomWidth: 1,
+      borderBottomColor: m3.outlineVariant,
+    },
+    appBarIcon: {
+      width: scaled(48, s),
+      height: scaled(48, s),
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderRadius: scaled(24, s),
+    },
+    appBarTitle: { flex: 1, textAlign: 'center', color: m3.onSurface },
+    button: {
+      minHeight: scaled(56, s),
+      borderRadius: shape.pill,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: scaled(8, s),
+      paddingHorizontal: scaled(24, s),
+      paddingVertical: scaled(8, s),
+      minWidth: 0,
+    },
+    buttonOutlined: { borderWidth: 1, borderColor: m3.outline },
+    searchBar: {
+      height: scaled(56, s),
+      borderRadius: shape.pill,
+      backgroundColor: m3.surfaceContainerHigh,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: scaled(4, s),
+      paddingHorizontal: scaled(16, s),
+    },
+    searchInput: { flex: 1, fontSize: scaled(16, s), color: m3.onSurface, paddingVertical: scaled(8, s) },
+    searchAction: {
+      width: scaled(44, s),
+      height: scaled(44, s),
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    card: { borderRadius: shape.card, padding: scaled(16, s), overflow: 'hidden' },
+    cardShadow: {
+      elevation: 1,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+    },
+    imagePh: {
+      backgroundColor: m3.surfaceContainerHighest,
+      borderRadius: shape.card,
+      borderWidth: 1,
+      borderColor: m3.outlineVariant,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    fab: { justifyContent: 'center', alignItems: 'center', elevation: 3, boxShadow: '0 2px 6px rgba(0,0,0,0.3)' },
+    tonalIcon: {
+      width: scaled(48, s),
+      height: scaled(48, s),
+      borderRadius: scaled(24, s),
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: m3.outlineVariant, backgroundColor: m3.surface },
+    tabItem: { flex: 1 },
+    tab: { height: scaled(40, s), justifyContent: 'center', alignItems: 'center', paddingHorizontal: scaled(8, s) },
+    tabIndicator: {
+      position: 'absolute',
+      bottom: 0,
+      height: 3,
+      width: scaled(64, s),
+      borderTopLeftRadius: 3,
+      borderTopRightRadius: 3,
+    },
+    listItem: {
+      minHeight: scaled(72, s),
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: m3.surfaceContainerLow,
+      paddingHorizontal: scaled(16, s),
+      paddingVertical: scaled(8, s),
+      gap: scaled(16, s),
+      marginBottom: scaled(3, s),
+    },
+    listIcon: {
+      width: scaled(40, s),
+      height: scaled(40, s),
+      borderRadius: scaled(20, s),
+      backgroundColor: m3.primaryContainer,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    listText: { flex: 1, gap: scaled(2, s) },
+    badge: {
+      backgroundColor: m3.primary,
+      borderRadius: shape.pill,
+      paddingHorizontal: scaled(10, s),
+      paddingVertical: scaled(4, s),
+    },
+    chip: {
+      minHeight: scaled(44, s),
+      justifyContent: 'center',
+      paddingHorizontal: scaled(16, s),
+      paddingVertical: scaled(12, s),
+      borderRadius: shape.pill,
+      borderWidth: 1,
+      borderColor: m3.outline,
+    },
+    chipActive: { backgroundColor: m3.secondaryContainer, borderColor: m3.secondaryContainer },
+    loadingView: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: scaled(24, s) },
+    emptyState: {
+      paddingTop: scaled(60, s),
+      paddingHorizontal: scaled(24, s),
+      alignItems: 'center',
+      gap: scaled(12, s),
+    },
+    emptyIcon: {
+      width: scaled(80, s),
+      height: scaled(80, s),
+      borderRadius: scaled(40, s),
+      backgroundColor: m3.surfaceContainerHigh,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+  });
+}
+
+/** 現在の画面幅に応じた m3 コンポーネント用スタイル。 */
+function useStyles() {
+  const { scale, shape } = useM3();
+  return React.useMemo(() => createStyles(scale, shape), [scale, shape]);
+}

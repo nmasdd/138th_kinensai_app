@@ -3,12 +3,21 @@
  *
  * - POST /api/admin/login  { password } → 200 { ok:true, token, expiresAt } / 401 { ok:false }
  * - POST /api/admin/verify { token }    → 200 { ok:true } / 200 { ok:false }
- * - GET  /api/content/<name>.json       → KVから共有コンテンツを公開配信 (認証不要・5分キャッシュ)
+ * - GET  /api/content/<name>.json       → KVから共有コンテンツを公開配信 (認証不要)
+ * - GET  /api/content/_meta.json        → 公開の版数 { version, updatedAt } を返す (認証不要)
  * - POST /api/content/publish { token, files: { name: value } } → 管理者トークンでKVへ公開
  * - POST /api/images/upload { token, contentType, data(base64) } → 画像をKVへ格納し公開URLを返す
  * - GET  /api/images/<key>                 → 画像を公開配信 (認証不要・長期キャッシュ)
  * - 上記以外 → ASSETS.fetch(request) (Expo Web の静的配信。SPAフォールバックは
  *   wrangler.toml の assets.not_found_handling に従う)
+ *
+ * 反映遅延 (目標30秒以内):
+ * - 共有コンテンツの `cache-control` は短命 (`max-age=15, stale-while-revalidate=15`)。
+ * - 公開時に `_meta.json` の `version` (= publishedAt) を更新する。クライアントは
+ *   取得URLに `?v=<version>` を付けるため、公開のたびにCDN/ブラウザのキャッシュキーが
+ *   変わり、古いキャッシュを引かない。
+ * - クライアントは `_meta.json` を起動時・フォアグラウンド復帰時・在席中は定期に
+ *   軽く確認し、version が変わったら各キーを取り直す。
  *
  * パスワード本体は Worker シークレット ADMIN_PASSWORD にのみ保持し、
  * クライアントバンドルには一切含めない。認証成功時に返すトークンは
@@ -71,6 +80,7 @@ const CONTENT_KEYS = new Set([
   'tickets.json',
   'notifications.json',
   'stage-groups.json',
+  'auditorium-groups.json',
   'congestion.json',
   'delays.json',
   'timetable-overrides.json',
@@ -78,6 +88,17 @@ const CONTENT_KEYS = new Set([
   'now-override.json',
   'map-layout.json',
 ]);
+
+/** 公開の版数を持つメタキー (CONTENT_KEYS には含めない。誰でもGET可)。 */
+const META_KEY = '_meta.json';
+
+/**
+ * 共有コンテンツのキャッシュ制御。反映目標30秒以内のため短命にし、
+ * 期限切れ後は stale を返しつつバックグラウンドで再検証させる。
+ */
+const CONTENT_CACHE_CONTROL = 'public, max-age=15, stale-while-revalidate=15';
+/** _meta.json は版数確認用のためさらに短命。 */
+const META_CACHE_CONTROL = 'public, max-age=10';
 
 /** isolate内ベストエフォートの総当たり対策 (分散環境では完全ではない)。 */
 const attempts = new Map<string, { count: number; resetAt: number }>();
@@ -220,15 +241,35 @@ async function handleVerify(request: Request, env: Env): Promise<Response> {
   return json({ ok: true });
 }
 
+/** 公開の版数 (公開のたびに更新)。未公開なら null。 */
+async function readMeta(env: Env): Promise<{ version: number; updatedAt: number } | null> {
+  const raw = await env.CONTENT.get(META_KEY, 'text');
+  if (raw === null) return null;
+  const parsed = safeParseJson(raw);
+  if (typeof parsed === 'object' && parsed !== null) {
+    const version = Number((parsed as { version?: unknown }).version);
+    const updatedAt = Number((parsed as { updatedAt?: unknown }).updatedAt);
+    if (Number.isFinite(version)) {
+      return { version, updatedAt: Number.isFinite(updatedAt) ? updatedAt : version };
+    }
+  }
+  return null;
+}
+
 /** 共有コンテンツの公開配信 (認証不要)。 */
 async function handleContentGet(name: string, env: Env): Promise<Response> {
+  // 版数メタは誰でも取得可 (全端末が起動/復帰時に確認する)。
+  if (name === META_KEY) {
+    const meta = (await readMeta(env)) ?? { version: 0, updatedAt: 0 };
+    return json(meta, 200, META_CACHE_CONTROL);
+  }
   if (!CONTENT_KEYS.has(name)) return json({ ok: false }, 404);
   const raw = await env.CONTENT.get(name, 'text');
   if (raw === null) return json({ ok: false }, 404);
   return new Response(raw, {
     headers: {
       'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'public, max-age=300',
+      'cache-control': CONTENT_CACHE_CONTROL,
     },
   });
 }
@@ -347,8 +388,13 @@ async function handleContentPublish(request: Request, env: Env): Promise<Respons
   for (const [name, raw] of serialized) {
     await env.CONTENT.put(name, raw);
   }
+  // 公開の版数を更新する (クライアントはこの version でキャッシュを無効化する)
+  const updatedAt = Date.now();
+  const prev = await readMeta(env);
+  const version = Math.max(updatedAt, (prev?.version ?? 0) + 1);
+  await env.CONTENT.put(META_KEY, JSON.stringify({ version, updatedAt }));
   resetAttempts(ip, 'publish');
-  return json({ ok: true, published: names });
+  return json({ ok: true, published: names, version });
 }
 
 export default {

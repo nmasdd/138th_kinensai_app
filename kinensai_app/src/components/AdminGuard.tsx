@@ -2,9 +2,10 @@ import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { Platform, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { M3Button, M3Icon, TopAppBar } from './m3';
-import { adminStyles } from './adminUi';
-import { getContentUrl, isRemoteContentConfigured } from '../data/remoteConfig';
-import { m3, m3type } from '../theme';
+import { useAdminStyles } from './adminUi';
+import { getContentUrl, isRemoteContentConfigured, isRemoteContentEnabled } from '../data/remoteConfig';
+import { m3, scaled } from '../theme';
+import { useM3 } from '../context/responsive';
 
 // NOTE: getContentUrl は remoteConfig 側にあるためここでは再exportしない。
 // このファイルは管理者ページ用の公開フロー案内バナー専用である。
@@ -15,29 +16,33 @@ import { m3, m3type } from '../theme';
  * を明示する。
  */
 export function AdminPublishNote() {
+  const { type, scale } = useM3();
   const configured = isRemoteContentConfigured();
+  const enabled = isRemoteContentEnabled();
   return (
     <View
       style={{
         backgroundColor: m3.primaryContainer,
-        borderRadius: 20,
-        padding: 12,
+        borderRadius: scaled(20, scale),
+        padding: scaled(12, scale),
         flexDirection: 'row',
-        gap: 8,
+        gap: scaled(8, scale),
         alignItems: 'flex-start',
       }}
       accessibilityRole="none"
       accessibilityLabel="公開フロー案内"
     >
-      <M3Icon name="public" size={20} color={m3.onPrimaryContainer} />
-      <View style={{ flex: 1, gap: 4 }}>
-        <Text style={[m3type.titleSmall, { color: m3.onPrimaryContainer }]}>
-          {configured ? '全世界配信: 設定済み' : '全世界配信: 未設定'}
+      <M3Icon name={enabled ? 'public' : 'science'} size={20} color={m3.onPrimaryContainer} />
+      <View style={{ flex: 1, gap: scaled(4, scale) }}>
+        <Text style={[type.titleSmall, { color: m3.onPrimaryContainer }]}>
+          {enabled ? (configured ? '全世界配信: 設定済み' : '全世界配信: 未設定') : '開発モード: 配信オフ'}
         </Text>
-        <Text style={[m3type.bodyMedium, { color: m3.onPrimaryContainer }]}>
-          {configured
-            ? `各画面の保存はこの端末のプレビューです。「データ管理」の「全世界に公開」で全端末に反映されます (最大5分遅延)。`
-            : `各画面の保存はこの端末のプレビューです。全端末へ反映するには、配信URL (extra.contentUrl) の設定が必要です。`}
+        <Text style={[type.bodyMedium, { color: m3.onPrimaryContainer }]}>
+          {!enabled
+            ? `開発中は本番の配信値を読み込みません (同梱値のみ)。各画面の保存はこの端末のプレビューです。配信値を確認するには EXPO_PUBLIC_ENABLE_REMOTE_CONTENT=1 で起動してください。`
+            : configured
+              ? `各画面の保存はこの端末のプレビューです。「データ管理」の「全世界に公開」で全端末に反映されます (開いている端末は30秒以内、復帰時に即時)。`
+              : `各画面の保存はこの端末のプレビューです。全端末へ反映するには、配信URL (extra.contentUrl) の設定が必要です。`}
         </Text>
       </View>
     </View>
@@ -134,11 +139,23 @@ async function postAdminApi(path: string, payload: unknown): Promise<unknown | n
 }
 
 /**
- * 【一時設定】管理者ページのパスワード認証をスキップする。
- * 動作確認用。公開前・本番デプロイ前に必ず false に戻すこと。
- * false に戻すと通常のサーバ認証 (POST /api/admin/login) に戻る。
+ * 【開発補助】管理者ページのパスワード認証をスキップする。
+ * - 本番ビルド (`__DEV__ === false`) では常に認証必須。
+ * - 開発時も既定では認証必須。ローカルで認証APIを用意せず確認したい場合だけ
+ *   `EXPO_PUBLIC_ADMIN_BYPASS=1` を付けて起動する
+ *   (例: `EXPO_PUBLIC_ADMIN_BYPASS=1 npm run web`)。
+ * - 誤って本番で無効化されることがないよう、フラグは環境変数のみで判定する。
  */
-const ADMIN_BYPASS_PASSWORD = true;
+const ADMIN_BYPASS_PASSWORD =
+  (() => {
+    if (!__DEV__) return false;
+    try {
+      const v = (process.env?.EXPO_PUBLIC_ADMIN_BYPASS ?? '').trim();
+      return v === '1' || v === 'true';
+    } catch {
+      return false;
+    }
+  })();
 
 /** 全 /admin/* ページをラップし、未認証ならパスワード入力を先に表示する。 */
 export function AdminGate({ children }: { children: React.ReactNode }) {
@@ -147,6 +164,8 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
 }
 
 function AdminGateLocked({ children }: { children: React.ReactNode }) {
+  const { type } = useM3();
+  const styles = useAdminStyles();
   const unlocked = useSyncExternalStore(
     subscribeAdminAuth,
     getAdminAuthSnapshot,
@@ -184,10 +203,10 @@ function AdminGateLocked({ children }: { children: React.ReactNode }) {
 
   if (checking) {
     return (
-      <SafeAreaView style={adminStyles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <TopAppBar title="管理者用" />
-        <View style={adminStyles.body}>
-          <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>認証を確認しています…</Text>
+        <View style={styles.body}>
+          <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>認証を確認しています…</Text>
         </View>
       </SafeAreaView>
     );
@@ -217,14 +236,14 @@ function AdminGateLocked({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SafeAreaView style={adminStyles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <TopAppBar title="管理者用" />
-      <View style={adminStyles.body}>
-        <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>
+      <View style={styles.body}>
+        <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
           管理者用ページです。続けるにはパスワードを入力してください。
         </Text>
         <TextInput
-          style={adminStyles.input}
+          style={styles.input}
           value={password}
           onChangeText={(v) => {
             setPassword(v);
@@ -238,7 +257,7 @@ function AdminGateLocked({ children }: { children: React.ReactNode }) {
           onSubmitEditing={submit}
           accessibilityLabel="管理者パスワード"
         />
-        {error ? <Text style={[m3type.bodyMedium, { color: m3.error }]}>{error}</Text> : null}
+        {error ? <Text style={[type.bodyMedium, { color: m3.error }]}>{error}</Text> : null}
         <M3Button label={busy ? '認証中…' : '認証'} icon="lock" onPress={submit} />
       </View>
     </SafeAreaView>

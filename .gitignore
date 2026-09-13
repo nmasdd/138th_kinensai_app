@@ -11,3 +11,4 @@ dist/
 kinensai_app/dist/
 .expo/
 *.log
+.playwright-mcp/

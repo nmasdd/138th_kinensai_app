@@ -4,9 +4,12 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { M3Badge, M3Button, M3Card, M3EmptyState, M3IconButton, M3ImagePlaceholder, M3LoadingView, M3SearchBar, TopAppBar, goBackOrHome } from '../components/m3';
 import { ConfirmPop, Stagger } from '../components/anim';
 import { useStageGroups } from '../data/stage';
-import { m3, m3type } from '../theme';
+import { m3, scaled } from '../theme';
+import { useM3 } from '../context/responsive';
 
 export default function VoteScreen() {
+  const { type } = useM3();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const { groups, votedId, vote, isLoading } = useStageGroups();
@@ -29,7 +32,7 @@ export default function VoteScreen() {
         <M3LoadingView />
       ) : (
         <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-          <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>
+          <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
             応援したい出演者を1組選んで投票してください (変更可・端末に保存)。
           </Text>
           {filtered.map((g, i) => {
@@ -44,14 +47,14 @@ export default function VoteScreen() {
                 )}
                   <View style={styles.cardBody} accessibilityState={{ selected: voted }}>
                     <View style={styles.nameRow}>
-                      <Text style={[m3type.titleMedium, { color: m3.onSurface, flex: 1 }]}>{g.name}</Text>
+                      <Text style={[type.titleMedium, { color: m3.onSurface, flex: 1 }]}>{g.name}</Text>
                       {voted ? (
                         <ConfirmPop key={`voted-${g.id}`}>
                           <M3Badge label="投票中" />
                         </ConfirmPop>
                       ) : null}
                     </View>
-                  <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>
+                  <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
                     {g.detail || '補足テキストがここに入ります。'}
                   </Text>
                   <View style={styles.voteRow}>
@@ -69,7 +72,7 @@ export default function VoteScreen() {
           })}
           {filtered.length === 0 && (
             <M3EmptyState icon="how-to-vote">
-              <Text style={[m3type.bodyLarge, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
+              <Text style={[type.bodyLarge, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
                 一致する出演者がいません
               </Text>
             </M3EmptyState>
@@ -83,14 +86,21 @@ export default function VoteScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: m3.surface },
-  searchWrap: { paddingHorizontal: 16, paddingTop: 8 },
-  body: { padding: 16, gap: 16, paddingBottom: 32 },
-  card: { padding: 0 },
-  image: { width: '100%', height: 140 },
-  cardBody: { padding: 16, gap: 8 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  voteRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
-  backWrap: { alignItems: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
-});
+function createStyles(s: number) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: m3.surface },
+    searchWrap: { paddingHorizontal: scaled(16, s), paddingTop: scaled(8, s) },
+    body: { padding: scaled(16, s), gap: scaled(16, s), paddingBottom: scaled(32, s) },
+    card: { padding: 0 },
+    image: { width: '100%', height: scaled(140, s) },
+    cardBody: { padding: scaled(16, s), gap: scaled(8, s) },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: scaled(8, s) },
+    voteRow: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: scaled(4, s) },
+    backWrap: { alignItems: 'flex-end', paddingHorizontal: scaled(16, s), paddingBottom: scaled(16, s) },
+  });
+}
+
+function useStyles() {
+  const { scale } = useM3();
+  return React.useMemo(() => createStyles(scale), [scale]);
+}

@@ -9,7 +9,7 @@ import {
   adminErrorMessage,
   useAdminNotice,
 } from '../../components/AdminSaveBar';
-import { Chips, Field, ImageField, Section, adminStyles } from '../../components/adminUi';
+import { Chips, Field, ImageField, Section, useAdminStyles } from '../../components/adminUi';
 import { AdminGate } from '../../components/AdminGuard';
 import {
   loadAuditoriumBase,
@@ -23,10 +23,17 @@ import {
   type StageItem,
 } from '../../data/timetable';
 import { loadCongestion, saveCongestion, type CongestionLevel } from '../../data/congestion';
-import { saveStageGroups, bundledGroups, type StageGroup } from '../../data/stage';
+import {
+  saveStageGroups,
+  saveAuditoriumGroups,
+  bundledGroups,
+  bundledAuditoriumGroups,
+  type StageGroup,
+} from '../../data/stage';
 import { deleteStoredImage } from '../../data/images';
 import { loadJSON } from '../../data/kvStore';
-import { m3, m3type } from '../../theme';
+import { m3 } from '../../theme';
+import { useM3 } from '../../context/responsive';
 
 /**
  * 管理者用・ステージ/講堂 (/admin/stage)。
@@ -55,13 +62,20 @@ export default function AdminStageScreen() {
 }
 
 function AdminStageContent() {
+  const { type } = useM3();
+  const adminStyles = useAdminStyles();
   const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [groups, setGroups] = useState<StageGroup[]>([]);
+  const [audGroups, setAudGroups] = useState<StageGroup[]>([]);
+  /** 出演団体フォームの編集対象 (ステージ/講堂) */
+  const [groupKind, setGroupKind] = useState<'stage' | 'auditorium'>('stage');
   const [groupDraft, setGroupDraft] = useState({
     id: null as string | null,
     name: '',
     detail: '',
+    intro: '',
+    genre: '',
     imageUri: null as string | null,
     day: undefined as number | undefined,
     start: '',
@@ -89,13 +103,14 @@ function AdminStageContent() {
     let cancelled = false;
     (async () => {
       try {
-        const [base, ttOverrides, delayMap, nowOverride, level, stageGroups] = await Promise.all([
+        const [base, ttOverrides, delayMap, nowOverride, level, stageGroups, audGroupsRaw] = await Promise.all([
           loadAuditoriumBase().catch(() => [] as StageItem[]),
           loadTimetableOverrides().catch(() => ({ added: [] as StageItem[], edited: {}, deleted: [] as string[] })),
           loadDelayMap().catch(() => ({}) as Record<string, number>),
           loadNowOverride().catch(() => ({ auditoriumId: null as string | null })),
           loadCongestion().catch(() => 'unknown' as CongestionLevel),
           loadJSON<unknown>('stage-groups.json', null).catch(() => null),
+          loadJSON<unknown>('auditorium-groups.json', null).catch(() => null),
         ]);
         if (cancelled) return;
         setTtBase(base);
@@ -109,6 +124,7 @@ function AdminStageContent() {
         setNowOverrideId(nowOverride.auditoriumId);
         setCongestion(level);
         setGroups(Array.isArray(stageGroups) ? (stageGroups as StageGroup[]) : bundledGroups);
+        setAudGroups(Array.isArray(audGroupsRaw) ? (audGroupsRaw as StageGroup[]) : bundledAuditoriumGroups);
       } catch {
         if (!cancelled) showErr('読み込みに失敗しました');
       } finally {
@@ -121,11 +137,12 @@ function AdminStageContent() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [showErr]);
 
+  const activeGroups = groupKind === 'auditorium' ? audGroups : groups;
   const visibleGroups = useMemo(() => {
     const q = query.trim();
-    if (!q) return groups;
-    return groups.filter((g) => `${g.name} ${g.detail}`.includes(q));
-  }, [groups, query]);
+    if (!q) return activeGroups;
+    return activeGroups.filter((g) => `${g.name} ${g.detail} ${g.intro ?? ''} ${g.genre ?? ''}`.includes(q));
+  }, [activeGroups, query]);
 
   const visibleAuditorium = useMemo(() => {
     const q = query.trim();
@@ -135,32 +152,55 @@ function AdminStageContent() {
     );
   }, [auditorium, query]);
 
+  const emptyGroupDraft = {
+    id: null as string | null,
+    name: '',
+    detail: '',
+    intro: '',
+    genre: '',
+    imageUri: null as string | null,
+    day: undefined as number | undefined,
+    start: '',
+    end: '',
+    delay: '0',
+  };
+
   const saveGroupForm = async (): Promise<string> => {
     if (!groupDraft.name.trim()) throw new Error('団体名を入力してください');
     const start = groupDraft.start.trim();
     const end = groupDraft.end.trim();
     const hasTime = start.length > 0 || end.length > 0;
-    if (hasTime && (!/^\d{1,2}:\d{2}$/.test(start) || !/^\d{1,2}:\d{2}$/.test(end))) {
+    // 講堂の演目はタイムテーブル (CSV) を正とするため、時刻はステージのみ扱う
+    const isAuditorium = groupKind === 'auditorium';
+    if (!isAuditorium && hasTime && (!/^\d{1,2}:\d{2}$/.test(start) || !/^\d{1,2}:\d{2}$/.test(end))) {
       throw new Error('時刻は HH:MM 形式で入力してください');
     }
     try {
-      const id = groupDraft.id ?? `group-${Date.now()}`;
+      const id = groupDraft.id ?? `${isAuditorium ? 'aud' : 'group'}-${Date.now()}`;
       const delay = parseInt(groupDraft.delay, 10);
       const item: StageGroup = {
         id,
         name: groupDraft.name.trim(),
         detail: groupDraft.detail.trim(),
+        intro: groupDraft.intro.trim() || undefined,
+        genre: groupDraft.genre.trim() || undefined,
         imageUri: groupDraft.imageUri,
-        day: groupDraft.day === 0 || groupDraft.day === 1 ? groupDraft.day : undefined,
-        start: hasTime ? start : undefined,
-        end: hasTime ? end : undefined,
-        delayMinutes: Number.isFinite(delay) && delay > 0 ? delay : 0,
+        day: !isAuditorium && (groupDraft.day === 0 || groupDraft.day === 1) ? groupDraft.day : undefined,
+        start: !isAuditorium && hasTime ? start : undefined,
+        end: !isAuditorium && hasTime ? end : undefined,
+        delayMinutes: !isAuditorium && Number.isFinite(delay) && delay > 0 ? delay : 0,
       };
-      const next = groupDraft.id ? groups.map((g) => (g.id === id ? item : g)) : [...groups, item];
-      await saveStageGroups(next);
-      setGroups(next);
-      setGroupDraft({ id: null, name: '', detail: '', imageUri: null, day: undefined, start: '', end: '', delay: '0' });
-      return '出演団体を保存しました';
+      const source = isAuditorium ? audGroups : groups;
+      const next = groupDraft.id ? source.map((g) => (g.id === id ? item : g)) : [...source, item];
+      if (isAuditorium) {
+        await saveAuditoriumGroups(next);
+        setAudGroups(next);
+      } else {
+        await saveStageGroups(next);
+        setGroups(next);
+      }
+      setGroupDraft(emptyGroupDraft);
+      return isAuditorium ? '講堂出演団体を保存しました' : 'ステージ出演団体を保存しました';
     } catch {
       throw new Error('保存に失敗しました');
     }
@@ -168,15 +208,27 @@ function AdminStageContent() {
 
   const deleteGroup = async (id: string): Promise<string> => {
     try {
-      const target = groups.find((g) => g.id === id);
+      const isAuditorium = groupKind === 'auditorium';
+      const source = isAuditorium ? audGroups : groups;
+      const target = source.find((g) => g.id === id);
       if (target?.imageUri) await deleteStoredImage(target.imageUri);
-      const next = groups.filter((g) => g.id !== id);
-      await saveStageGroups(next);
-      setGroups(next);
-      return '出演団体を削除しました';
+      const next = source.filter((g) => g.id !== id);
+      if (isAuditorium) {
+        await saveAuditoriumGroups(next);
+        setAudGroups(next);
+      } else {
+        await saveStageGroups(next);
+        setGroups(next);
+      }
+      return isAuditorium ? '講堂出演団体を削除しました' : 'ステージ出演団体を削除しました';
     } catch {
       throw new Error('削除に失敗しました');
     }
+  };
+
+  const switchGroupKind = (kind: 'stage' | 'auditorium') => {
+    setGroupKind(kind);
+    setGroupDraft(emptyGroupDraft);
   };
 
   const saveTimetableAndDelays = async (): Promise<string> => {
@@ -282,14 +334,42 @@ function AdminStageContent() {
             <M3SearchBar value={query} onChangeText={setQuery} placeholder="団体・演目を検索" />
           </View>
 
-          <Section title="ステージ出演団体 (追加・編集・削除)">
+          <Section title="出演団体 (追加・編集・削除)">
+            <Field label="会場">
+              <View style={adminStyles.chips}>
+                {(
+                  [
+                    { value: 'stage', label: 'ステージ' },
+                    { value: 'auditorium', label: '講堂' },
+                  ] as const
+                ).map((o) => {
+                  const active = groupKind === o.value;
+                  return (
+                    <M3Touch key={o.value} onPress={() => switchGroupKind(o.value)} label={o.label} round>
+                      <View style={[adminStyles.chip, active && adminStyles.chipActive]}>
+                        <Text
+                          style={[type.labelLarge, { color: active ? m3.onPrimaryContainer : m3.onSurfaceVariant }]}
+                        >
+                          {o.label}
+                        </Text>
+                      </View>
+                    </M3Touch>
+                  );
+                })}
+              </View>
+            </Field>
+            {groupKind === 'auditorium' ? (
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
+                講堂の演目（団体名・時間割）は下の「講堂タイムテーブル」で編集します。ここでは紹介文・写真などの詳細を編集します。
+              </Text>
+            ) : null}
             {visibleGroups.map((g) => (
               <View key={g.id} style={adminStyles.row}>
                 <View style={adminStyles.rowText}>
-                  <Text style={[m3type.titleSmall, { color: m3.onSurface }]} numberOfLines={1}>
+                  <Text style={[type.titleSmall, { color: m3.onSurface }]} numberOfLines={1}>
                     {g.name}
                   </Text>
-                  <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={1}>
+                  <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={1}>
                     {g.detail}
                   </Text>
                 </View>
@@ -301,6 +381,8 @@ function AdminStageContent() {
                       id: g.id,
                       name: g.name,
                       detail: g.detail,
+                      intro: g.intro ?? '',
+                      genre: g.genre ?? '',
                       imageUri: g.imageUri ?? null,
                       day: g.day,
                       start: g.start ?? '',
@@ -309,7 +391,7 @@ function AdminStageContent() {
                     })
                   }
                 >
-                  <Text style={[m3type.labelLarge, adminStyles.link]}>編集</Text>
+                  <Text style={[type.labelLarge, adminStyles.link]}>編集</Text>
                 </M3Touch>
                 <M3Touch
                   label="削除"
@@ -318,12 +400,12 @@ function AdminStageContent() {
                     deleteGroup(g.id).then(showOk).catch((e) => showErr(adminErrorMessage(e)));
                   }}
                 >
-                  <Text style={[m3type.labelLarge, adminStyles.danger]}>削除</Text>
+                  <Text style={[type.labelLarge, adminStyles.danger]}>削除</Text>
                 </M3Touch>
               </View>
             ))}
             {visibleGroups.length === 0 ? (
-              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>一致する団体はありません</Text>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>一致する団体はありません</Text>
             ) : null}
             <View style={adminStyles.block}>
               <Field label="団体名">
@@ -335,13 +417,32 @@ function AdminStageContent() {
                   placeholderTextColor={m3.onSurfaceVariant}
                 />
               </Field>
-              <Field label="詳細">
+              <Field label="ジャンル (任意)">
+                <TextInput
+                  style={adminStyles.input}
+                  value={groupDraft.genre}
+                  onChangeText={(t) => setGroupDraft((p) => ({ ...p, genre: t }))}
+                  placeholder="例: 吹奏楽、ダンス"
+                  placeholderTextColor={m3.onSurfaceVariant}
+                />
+              </Field>
+              <Field label="短い紹介 (一覧用)">
                 <TextInput
                   style={[adminStyles.input, adminStyles.multiline]}
                   value={groupDraft.detail}
                   multiline
                   onChangeText={(t) => setGroupDraft((p) => ({ ...p, detail: t }))}
-                  placeholder="団体の紹介文"
+                  placeholder="団体の短い紹介文"
+                  placeholderTextColor={m3.onSurfaceVariant}
+                />
+              </Field>
+              <Field label="詳細な紹介文 (モーダル用)">
+                <TextInput
+                  style={[adminStyles.input, adminStyles.multiline]}
+                  value={groupDraft.intro}
+                  multiline
+                  onChangeText={(t) => setGroupDraft((p) => ({ ...p, intro: t }))}
+                  placeholder="タップしたときに表示する紹介文"
                   placeholderTextColor={m3.onSurfaceVariant}
                 />
               </Field>
@@ -351,86 +452,86 @@ function AdminStageContent() {
                   onChange={(uri) => setGroupDraft((p) => ({ ...p, imageUri: uri }))}
                 />
               </Field>
-              <Field label="ステージ演目の曜日">
-                <View style={adminStyles.chips}>
-                  {[
-                    { value: undefined, label: '未定' },
-                    { value: 0, label: '土' },
-                    { value: 1, label: '日' },
-                  ].map((o) => {
-                    const active = groupDraft.day === o.value;
-                    return (
-                      <M3Touch
-                        key={String(o.value)}
-                        onPress={() => setGroupDraft((p) => ({ ...p, day: o.value }))}
-                        label={o.label}
-                        round
-                      >
-                        <View style={[adminStyles.chip, active && adminStyles.chipActive]}>
-                          <Text
-                            style={[
-                              m3type.labelLarge,
-                              { color: active ? m3.onPrimaryContainer : m3.onSurfaceVariant },
-                            ]}
+              {groupKind === 'stage' ? (
+                <>
+                  <Field label="ステージ演目の曜日">
+                    <View style={adminStyles.chips}>
+                      {[
+                        { value: undefined, label: '未定' },
+                        { value: 0, label: '土' },
+                        { value: 1, label: '日' },
+                      ].map((o) => {
+                        const active = groupDraft.day === o.value;
+                        return (
+                          <M3Touch
+                            key={String(o.value)}
+                            onPress={() => setGroupDraft((p) => ({ ...p, day: o.value }))}
+                            label={o.label}
+                            round
                           >
-                            {o.label}
-                          </Text>
-                        </View>
-                      </M3Touch>
-                    );
-                  })}
-                </View>
-              </Field>
-              <View style={adminStyles.timeRow}>
-                <View style={adminStyles.timeField}>
-                  <Field label="開始 (HH:MM)">
-                    <TextInput
-                      style={adminStyles.input}
-                      value={groupDraft.start}
-                      onChangeText={(t) => setGroupDraft((p) => ({ ...p, start: t }))}
-                      placeholder="例: 12:15"
-                      placeholderTextColor={m3.onSurfaceVariant}
-                    />
+                            <View style={[adminStyles.chip, active && adminStyles.chipActive]}>
+                              <Text
+                                style={[
+                                  type.labelLarge,
+                                  { color: active ? m3.onPrimaryContainer : m3.onSurfaceVariant },
+                                ]}
+                              >
+                                {o.label}
+                              </Text>
+                            </View>
+                          </M3Touch>
+                        );
+                      })}
+                    </View>
                   </Field>
-                </View>
-                <View style={adminStyles.timeField}>
-                  <Field label="終了 (HH:MM)">
-                    <TextInput
-                      style={adminStyles.input}
-                      value={groupDraft.end}
-                      onChangeText={(t) => setGroupDraft((p) => ({ ...p, end: t }))}
-                      placeholder="例: 12:45"
-                      placeholderTextColor={m3.onSurfaceVariant}
-                    />
+                  <View style={adminStyles.timeRow}>
+                    <View style={adminStyles.timeField}>
+                      <Field label="開始 (HH:MM)">
+                        <TextInput
+                          style={adminStyles.input}
+                          value={groupDraft.start}
+                          onChangeText={(t) => setGroupDraft((p) => ({ ...p, start: t }))}
+                          placeholder="例: 12:15"
+                          placeholderTextColor={m3.onSurfaceVariant}
+                        />
+                      </Field>
+                    </View>
+                    <View style={adminStyles.timeField}>
+                      <Field label="終了 (HH:MM)">
+                        <TextInput
+                          style={adminStyles.input}
+                          value={groupDraft.end}
+                          onChangeText={(t) => setGroupDraft((p) => ({ ...p, end: t }))}
+                          placeholder="例: 12:45"
+                          placeholderTextColor={m3.onSurfaceVariant}
+                        />
+                      </Field>
+                    </View>
+                  </View>
+                  <Field label="遅延分数">
+                    <View style={adminStyles.delayRow}>
+                      <TextInput
+                        style={adminStyles.delayInput}
+                        value={groupDraft.delay}
+                        keyboardType="number-pad"
+                        onChangeText={(t) => setGroupDraft((p) => ({ ...p, delay: t.replace(/[^0-9]/g, '') }))}
+                        accessibilityLabel="ステージ演目の遅延分数"
+                      />
+                      <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>分</Text>
+                    </View>
                   </Field>
-                </View>
-              </View>
-              <Field label="遅延分数">
-                <View style={adminStyles.delayRow}>
-                  <TextInput
-                    style={adminStyles.delayInput}
-                    value={groupDraft.delay}
-                    keyboardType="number-pad"
-                    onChangeText={(t) => setGroupDraft((p) => ({ ...p, delay: t.replace(/[^0-9]/g, '') }))}
-                    accessibilityLabel="ステージ演目の遅延分数"
-                  />
-                  <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>分</Text>
-                </View>
-              </Field>
+                </>
+              ) : null}
               <View style={adminStyles.buttonRow}>
                 <M3Button
-                  label="出演団体を保存"
+                  label={groupKind === 'auditorium' ? '講堂団体を保存' : 'ステージ団体を保存'}
                   icon="save"
                   onPress={() => {
                     saveGroupForm().then(showOk).catch((e) => showErr(adminErrorMessage(e)));
                   }}
                 />
                 {groupDraft.id ? (
-                  <M3Button
-                    label="取消"
-                    variant="tonal"
-                    onPress={() => setGroupDraft({ id: null, name: '', detail: '', imageUri: null, day: undefined, start: '', end: '', delay: '0' })}
-                  />
+                  <M3Button label="取消" variant="tonal" onPress={() => setGroupDraft(emptyGroupDraft)} />
                 ) : null}
               </View>
             </View>
@@ -454,12 +555,12 @@ function AdminStageContent() {
               return (
                 <View key={it.id} style={adminStyles.block}>
                   <View style={adminStyles.blockHeader}>
-                    <Text style={[m3type.titleSmall, { color: m3.onSurface }]}>
+                    <Text style={[type.titleSmall, { color: m3.onSurface }]}>
                       {day === 0 ? '土' : '日'} {team}
                       {isAdded ? ' (追加分)' : ''}
                     </Text>
                     <M3Touch label={`${team}を削除`} round onPress={() => deleteTimetableItem(it.id)}>
-                      <Text style={[m3type.labelLarge, adminStyles.danger]}>削除</Text>
+                      <Text style={[type.labelLarge, adminStyles.danger]}>削除</Text>
                     </M3Touch>
                   </View>
                   <Field label="団体名">
@@ -483,7 +584,7 @@ function AdminStageContent() {
                             <View style={[adminStyles.chip, active && adminStyles.chipActive]}>
                               <Text
                                 style={[
-                                  m3type.labelLarge,
+                                  type.labelLarge,
                                   { color: active ? m3.onPrimaryContainer : m3.onSurfaceVariant },
                                 ]}
                               >
@@ -528,19 +629,19 @@ function AdminStageContent() {
                         onChangeText={(t) => setDelays((p) => ({ ...p, [it.id]: t.replace(/[^0-9]/g, '') }))}
                         accessibilityLabel={`${team}の遅延分数`}
                       />
-                      <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>分</Text>
+                      <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>分</Text>
                     </View>
                   </Field>
                 </View>
               );
             })}
             {visibleAuditorium.length === 0 ? (
-              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
                 {auditorium.length === 0 ? 'タイムテーブルが読み込めませんでした' : '一致する演目はありません'}
               </Text>
             ) : null}
             <View style={adminStyles.block}>
-              <Text style={[m3type.titleSmall, { color: m3.onSurface }]}>演目の新規追加</Text>
+              <Text style={[type.titleSmall, { color: m3.onSurface }]}>演目の新規追加</Text>
               <Field label="団体名">
                 <TextInput
                   style={adminStyles.input}
@@ -566,7 +667,7 @@ function AdminStageContent() {
                       >
                         <View style={[adminStyles.chip, active && adminStyles.chipActive]}>
                           <Text
-                            style={[m3type.labelLarge, { color: active ? m3.onPrimaryContainer : m3.onSurfaceVariant }]}
+                            style={[type.labelLarge, { color: active ? m3.onPrimaryContainer : m3.onSurfaceVariant }]}
                           >
                             {o.label}
                           </Text>
@@ -614,16 +715,16 @@ function AdminStageContent() {
           </Section>
 
           <Section title="いま開催中 (手動選択)">
-            <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, marginBottom: 8 }]}>
+            <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginBottom: 8 }]}>
               時刻による自動判定を手動で上書きします。「自動判定に戻す」を選ぶと解除されます。
             </Text>
             <M3Touch label="自動判定に戻す" round onPress={() => setNowOverrideId(null)}>
               <View style={[adminStyles.row, nowOverrideId === null && adminStyles.rowActive]}>
                 <View style={adminStyles.rowText}>
-                  <Text style={[m3type.titleSmall, { color: m3.onSurface }]}>自動判定に戻す</Text>
-                  <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>選択解除で時刻からの自動判定に戻ります</Text>
+                  <Text style={[type.titleSmall, { color: m3.onSurface }]}>自動判定に戻す</Text>
+                  <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>選択解除で時刻からの自動判定に戻ります</Text>
                 </View>
-                <Text style={[m3type.labelLarge, { color: nowOverrideId === null ? m3.primary : m3.onSurfaceVariant }]}>
+                <Text style={[type.labelLarge, { color: nowOverrideId === null ? m3.primary : m3.onSurfaceVariant }]}>
                   {nowOverrideId === null ? '選択中' : '選択'}
                 </Text>
               </View>
@@ -639,14 +740,14 @@ function AdminStageContent() {
                 >
                   <View style={[adminStyles.row, active && adminStyles.rowActive]}>
                     <View style={adminStyles.rowText}>
-                      <Text style={[m3type.titleSmall, { color: m3.onSurface }]} numberOfLines={1}>
+                      <Text style={[type.titleSmall, { color: m3.onSurface }]} numberOfLines={1}>
                         {it.day === 0 ? '土' : '日'} {it.team}
                       </Text>
-                      <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={1}>
+                      <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={1}>
                         {it.start}–{it.end}
                       </Text>
                     </View>
-                    <Text style={[m3type.labelLarge, { color: active ? m3.primary : m3.onSurfaceVariant }]}>
+                    <Text style={[type.labelLarge, { color: active ? m3.primary : m3.onSurfaceVariant }]}>
                       {active ? '選択中' : '選択'}
                     </Text>
                   </View>

@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { M3Icon } from './m3';
-import { m3, m3shape, m3type } from '../theme';
+import { m3, scaled, type M3Shape } from '../theme';
+import { useM3 } from '../context/responsive';
 import { ROOM_FILL, VECTOR_ROOMS, type VectorFloor, type VectorRoom } from '../data/vectorMap';
 import { hotspotForExhibitionId } from '../data/mapHotspots';
 
@@ -13,8 +14,6 @@ const FIT_FALLBACK = Math.min(380 / WORLD_W, 380 / WORLD_H);
 interface Props {
   floor: VectorFloor;
   selectedId: string | null;
-  blinkId: string | null;
-  blinkAnim: Animated.Value;
   locId?: string | null;
   /** 現在地 (0〜1 の相対座標)。Googleマップ風の青いドットで表示する */
   selfPos?: { x: number; y: number } | null;
@@ -97,19 +96,22 @@ function VendingMachineIcon({ size, color }: { size: number; color: string }) {
  * 画像埋め込みなし。ドラッグでパン、ピンチ/ホイール/ダブルタップ/ボタンでズーム。
  * 部屋は vectorMap.ts の模式図、展示マーカーは mapHotspots.ts と展示IDで対応。
  */
-export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, selfPos, roomsOverride, onPick, roomsTappable, onSelect }: Props) {
+export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride, onPick, roomsTappable, onSelect }: Props) {
+  const { type, scale: uiScale } = useM3();
+  const styles = useStyles();
   const [fit, setFit] = useState(FIT_FALLBACK);
   const [scale, setScale] = useState(FIT_FALLBACK);
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
-  const state = useRef({ scale: FIT_FALLBACK, tx: 0, ty: 0, lastDist: 0, lastX: 0, lastY: 0, lastTap: 0, startX: 0, startY: 0, moved: false });
+  const state = useRef({ scale: FIT_FALLBACK, tx: 0, ty: 0, lastDist: 0, lastX: 0, lastY: 0, lastTap: 0, startX: 0, startY: 0, moved: false, pinch: false });
   const viewW = useRef(0);
   const viewH = useRef(0);
   const fitRef = useRef(FIT_FALLBACK);
   const didFitRef = useRef(false);
   const wrapRef = useRef<View>(null);
-  const [selfPulse] = useState(() => new Animated.Value(0));
   const centeredSelfRef = useRef<string | null>(null);
+  // mapWrap の画面上の位置 (ジェスチャー位置→ローカル座標の換算に使う)
+  const wrapRectRef = useRef({ left: 0, top: 0, width: 0, height: 0 });
   // PanResponder は初回生成のクロージャを保持するため、最新の onPick を ref 経由で読む
   const onPickRef = useRef(onPick);
   useEffect(() => {
@@ -145,26 +147,47 @@ export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, se
     setTy(cy);
   };
 
-  // マップ枠の画面上の位置を測る (作成モードのタップ→ワールド座標換算に使う)
+  // マップ枠の画面上の位置を測る (ジェスチャー位置のローカル座標換算に使う)
   const measureWrap = (cb: (left: number, top: number, width: number, height: number) => void) => {
     const node = wrapRef.current as unknown as {
       getBoundingClientRect?: () => { left: number; top: number; width: number; height: number };
       measureInWindow?: (fn: (x: number, y: number, w: number, h: number) => void) => void;
     } | null;
+    const done = (left: number, top: number, width: number, height: number) => {
+      wrapRectRef.current = { left, top, width, height };
+      cb(left, top, width, height);
+    };
     if (!node) {
-      cb(0, 0, viewW.current, viewH.current);
+      done(0, 0, viewW.current, viewH.current);
       return;
     }
     if (Platform.OS === 'web' && typeof node.getBoundingClientRect === 'function') {
       const r = node.getBoundingClientRect();
-      cb(r.left, r.top, r.width, r.height);
+      done(r.left, r.top, r.width, r.height);
       return;
     }
     if (typeof node.measureInWindow === 'function') {
-      node.measureInWindow((x, y, w, h) => cb(x, y, w, h));
+      node.measureInWindow((x, y, w, h) => done(x, y, w, h));
       return;
     }
-    cb(0, 0, viewW.current, viewH.current);
+    done(0, 0, viewW.current, viewH.current);
+  };
+
+  /**
+   * ジェスチャー位置 (mapWrap ローカル座標) の下にあるワールド点を固定したまま
+   * 拡大縮小する。screen = center + (world - worldCenter)*scale + t の関係から、
+   * 基準点 P を固定する t を逆算する。
+   */
+  const zoomAt = (nextScale: number, localX: number, localY: number) => {
+    const s0 = state.current.scale;
+    const s1 = clamp(nextScale, fitRef.current, MAX_SCALE);
+    if (s1 === s0) return;
+    const ratio = s1 / s0;
+    const cx = viewW.current / 2;
+    const cy = viewH.current / 2;
+    const tx1 = localX - cx - (localX - cx - state.current.tx) * ratio;
+    const ty1 = localY - cy - (localY - cy - state.current.ty) * ratio;
+    apply(s1, tx1, ty1);
   };
 
   // フロア切替時は全体表示にリセット
@@ -181,20 +204,6 @@ export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, se
   );
   const selfDotR = useMemo(() => clamp(10 / scale, 4, 24), [scale]);
   const selfAccR = useMemo(() => clamp(26 / scale, 10, 80), [scale]);
-  const selfPulseScale = useMemo(
-    () => selfPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2.4] }),
-    [selfPulse],
-  );
-  const selfPulseOpacity = useMemo(
-    () => selfPulse.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0] }),
-    [selfPulse],
-  );
-
-  useEffect(() => {
-    const anim = Animated.loop(Animated.timing(selfPulse, { toValue: 1, duration: 1400, useNativeDriver: true }));
-    anim.start();
-    return () => anim.stop();
-  }, [selfPulse]);
 
   // 現在地が指定されたら初回だけ画面中央へ寄せる (以後のパン操作は尊重)
   const centerOnSelf = () => {
@@ -232,8 +241,11 @@ export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, se
     node.style.overscrollBehavior = 'contain';
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      const r = node.getBoundingClientRect?.();
+      const px = r ? e.clientX - r.left : viewW.current / 2;
+      const py = r ? e.clientY - r.top : viewH.current / 2;
       const next = state.current.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15);
-      apply(next, state.current.tx, state.current.ty);
+      zoomAt(next, px, py);
     };
     const stopDefault = (e: Event) => e.preventDefault();
     node.addEventListener('wheel', onWheel, { passive: false });
@@ -255,25 +267,30 @@ export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, se
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: (e) => {
+          // ジェスチャー位置→ローカル座標換算用に枠位置を更新 (web は同期)
+          measureWrap(() => {});
           const touches = (e.nativeEvent as unknown as { touches?: { pageX: number; pageY: number }[] }).touches;
           if (touches && touches.length === 2) {
             const dx = touches[0].pageX - touches[1].pageX;
             const dy = touches[0].pageY - touches[1].pageY;
+            state.current.pinch = true;
             state.current.lastDist = Math.sqrt(dx * dx + dy * dy);
           } else {
+            state.current.pinch = false;
+            state.current.lastDist = 0;
             state.current.lastX = e.nativeEvent.pageX;
             state.current.lastY = e.nativeEvent.pageY;
             state.current.startX = e.nativeEvent.pageX;
             state.current.startY = e.nativeEvent.pageY;
             state.current.moved = false;
-            // ダブルタップでズームイン (Googleマップ風)
+            // ダブルタップでジェスチャー位置を基準にズーム (Googleマップ風)
             // eslint-disable-next-line react-hooks/purity
             const now = Date.now();
             if (now - state.current.lastTap < 300) {
               const next = state.current.scale >= MAX_SCALE ? fitRef.current : state.current.scale * 1.8;
-              apply(state.current.scale, state.current.tx, state.current.ty);
-              // apply後にnextへ
-              requestAnimationFrame(() => apply(next, state.current.tx, state.current.ty));
+              const localX = e.nativeEvent.pageX - wrapRectRef.current.left;
+              const localY = e.nativeEvent.pageY - wrapRectRef.current.top;
+              zoomAt(next, localX, localY);
               state.current.lastTap = 0;
             } else {
               state.current.lastTap = now;
@@ -286,11 +303,27 @@ export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, se
             const dx = touches[0].pageX - touches[1].pageX;
             const dy = touches[0].pageY - touches[1].pageY;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            if (state.current.lastDist > 0) {
-              const next = state.current.scale * (dist / state.current.lastDist);
-              apply(next, state.current.tx, state.current.ty);
+            if (!state.current.pinch || state.current.lastDist <= 0) {
+              // 2本目が触れた開始フレーム: 基準距離を取るだけで拡大縮小はしない
+              // (古い lastDist と比較して誤った倍率ジャンプになるのを防ぐ)
+              state.current.pinch = true;
+              state.current.lastDist = dist;
+              return;
             }
+            // ピンチ中点を固定して拡大縮小する
+            const midX = (touches[0].pageX + touches[1].pageX) / 2 - wrapRectRef.current.left;
+            const midY = (touches[0].pageY + touches[1].pageY) / 2 - wrapRectRef.current.top;
+            const next = state.current.scale * (dist / state.current.lastDist);
             state.current.lastDist = dist;
+            zoomAt(next, midX, midY);
+            return;
+          }
+          if (state.current.pinch) {
+            // ピンチから指を1本離した直後: パン基準を取り直す (ジャンプ防止)
+            state.current.pinch = false;
+            state.current.lastDist = 0;
+            state.current.lastX = e.nativeEvent.pageX;
+            state.current.lastY = e.nativeEvent.pageY;
             return;
           }
           if (
@@ -326,8 +359,9 @@ export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, se
     [],
   );
 
-  const zoomIn = () => apply(state.current.scale * 1.4, state.current.tx, state.current.ty);
-  const zoomOut = () => apply(state.current.scale / 1.4, state.current.tx, state.current.ty);
+  // ボタン操作は画面中央を基準にする
+  const zoomIn = () => zoomAt(state.current.scale * 1.4, viewW.current / 2, viewH.current / 2);
+  const zoomOut = () => zoomAt(state.current.scale / 1.4, viewW.current / 2, viewH.current / 2);
   const reset = () => apply(fitRef.current, 0, 0);
   // QR読取位置の部屋へセンタリング (リセットとは別動作)
   const centerOnLoc = () => {
@@ -401,12 +435,11 @@ export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, se
         </View>
         {rooms.map((r) => {
           const active = isActiveRoom(r);
-          const flashing = blinkId != null && (r.id === blinkId || hotspotForExhibitionId(blinkId)?.id === r.id);
           const isLoc = isLocRoom(r);
           const tappable =
             (roomsTappable ?? onPick == null) && (r.kind === 'class' || r.kind === 'club' || r.kind === 'outdoor');
           const body = (
-            <Animated.View
+            <View
               style={[
                 styles.room,
                 {
@@ -418,13 +451,12 @@ export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, se
                   borderColor: active ? m3.primary : isLoc ? m3.primary : m3.outlineVariant,
                   borderWidth: active ? 6 : isLoc ? 3 : 1.5,
                 },
-                flashing && { opacity: blinkAnim },
               ]}
             >
               {r.label ? (
                 <Text
                   style={[
-                    m3type.labelMedium,
+                    type.labelMedium,
                     {
                       color: active ? m3.onPrimaryContainer : m3.onSurface,
                       fontSize: labelFontSize,
@@ -453,7 +485,7 @@ export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, se
                 </View>
               ) : null}
               {active ? <View style={styles.activePin} /> : null}
-            </Animated.View>
+            </View>
           );
           if (!tappable) return <View key={r.id}>{body}</View>;
           return (
@@ -483,20 +515,6 @@ export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, se
                 },
               ]}
             />
-            <Animated.View
-              style={[
-                styles.selfPulse,
-                {
-                  left: selfWorld.x - selfAccR,
-                  top: selfWorld.y - selfAccR,
-                  width: selfAccR * 2,
-                  height: selfAccR * 2,
-                  borderRadius: selfAccR,
-                  transform: [{ scale: selfPulseScale }],
-                  opacity: selfPulseOpacity,
-                },
-              ]}
-            />
             <View
               accessibilityLabel="現在地"
               style={[
@@ -518,7 +536,7 @@ export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, se
 
       {/* 操作UI・凡例は地図と重ならないよう外側に配置する */}
       <View style={styles.controlsRow}>
-        <Text style={[m3type.labelMedium, styles.metaText]}>
+        <Text style={[type.labelMedium, styles.metaText]}>
           北 ↑ ・ {floor} ・ x{fit > 0 ? (scale / fit).toFixed(1) : scale.toFixed(1)}
         </Text>
         <View style={styles.controlsButtons}>
@@ -556,75 +574,99 @@ export function VectorMapView({ floor, selectedId, blinkId, blinkAnim, locId, se
       </View>
       <View style={styles.legend}>
         <View style={[styles.legendSwatch, { backgroundColor: ROOM_FILL.class }]} />
-        <Text style={[m3type.labelMedium, styles.metaText]}>教室</Text>
+        <Text style={[type.labelMedium, styles.metaText]}>教室</Text>
         <View style={[styles.legendSwatch, { backgroundColor: ROOM_FILL.club }]} />
-        <Text style={[m3type.labelMedium, styles.metaText]}>特別教室</Text>
+        <Text style={[type.labelMedium, styles.metaText]}>特別教室</Text>
         <View style={[styles.legendSwatch, { backgroundColor: ROOM_FILL.outdoor }]} />
-        <Text style={[m3type.labelMedium, styles.metaText]}>屋外</Text>
+        <Text style={[type.labelMedium, styles.metaText]}>屋外</Text>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { width: 380, maxWidth: '100%', alignSelf: 'center', gap: 8 },
-  mapWrap: {
-    width: '100%',
-    height: 380,
-    borderRadius: m3shape.card,
-    backgroundColor: m3.surfaceContainerHighest,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: m3.outlineVariant,
-  },
-  grid: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
-  gridV: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: m3.outlineVariant, opacity: 0.5 },
-  gridH: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: m3.outlineVariant, opacity: 0.5 },
-  world: { position: 'absolute', left: '50%', top: '50%', marginLeft: -WORLD_W / 2, marginTop: -WORLD_H / 2 },
-  room: {
-    position: 'absolute',
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 2,
-    padding: 4,
-  },
-  locDot: { position: 'absolute', top: 2, right: 2 },
-  selfAccuracy: { position: 'absolute', backgroundColor: 'rgba(26,115,232,0.16)' },
-  selfPulse: { position: 'absolute', backgroundColor: 'rgba(26,115,232,0.28)' },
-  selfDot: {
-    position: 'absolute',
-    backgroundColor: '#1A73E8',
-    borderColor: '#FFFFFF',
-    elevation: 4,
-    boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-  },
-  activePin: {
-    position: 'absolute',
-    top: -8,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: m3.primary,
-    borderWidth: 2,
-    borderColor: m3.onPrimary,
-  },
-  controlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
-  controlsButtons: { flexDirection: 'row', gap: 8, marginLeft: 'auto' },
-  zoomBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: m3.surface,
-    borderWidth: 1,
-    borderColor: m3.outlineVariant,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-    boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-  },
-  locBtn: { borderColor: m3.primary, borderWidth: 2 },
-  metaText: { color: m3.onSurfaceVariant },
-  legend: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', paddingHorizontal: 4 },
-  legendSwatch: { width: 14, height: 14, borderRadius: 4, borderWidth: 1, borderColor: m3.outlineVariant },
-});
+function createStyles(s: number, shape: M3Shape) {
+  return StyleSheet.create({
+    root: { width: scaled(380, s), maxWidth: '100%', alignSelf: 'center', gap: scaled(8, s) },
+    mapWrap: {
+      width: '100%',
+      height: scaled(380, s),
+      borderRadius: shape.card,
+      backgroundColor: m3.surfaceContainerHighest,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: m3.outlineVariant,
+    },
+    grid: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
+    gridV: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: m3.outlineVariant, opacity: 0.5 },
+    gridH: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: m3.outlineVariant, opacity: 0.5 },
+    world: { position: 'absolute', left: '50%', top: '50%', marginLeft: -WORLD_W / 2, marginTop: -WORLD_H / 2 },
+    room: {
+      position: 'absolute',
+      borderRadius: scaled(10, s),
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: scaled(2, s),
+      padding: scaled(4, s),
+    },
+    locDot: { position: 'absolute', top: scaled(2, s), right: scaled(2, s) },
+    selfAccuracy: { position: 'absolute', backgroundColor: 'rgba(26,115,232,0.16)' },
+    selfDot: {
+      position: 'absolute',
+      backgroundColor: '#1A73E8',
+      borderColor: '#FFFFFF',
+      elevation: 4,
+      boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+    },
+    activePin: {
+      position: 'absolute',
+      top: scaled(-8, s),
+      width: scaled(16, s),
+      height: scaled(16, s),
+      borderRadius: scaled(8, s),
+      backgroundColor: m3.primary,
+      borderWidth: 2,
+      borderColor: m3.onPrimary,
+    },
+    controlsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: scaled(8, s),
+      flexWrap: 'wrap',
+    },
+    controlsButtons: { flexDirection: 'row', gap: scaled(8, s), marginLeft: 'auto' },
+    zoomBtn: {
+      width: scaled(44, s),
+      height: scaled(44, s),
+      borderRadius: scaled(22, s),
+      backgroundColor: m3.surface,
+      borderWidth: 1,
+      borderColor: m3.outlineVariant,
+      justifyContent: 'center',
+      alignItems: 'center',
+      elevation: 3,
+      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+    },
+    locBtn: { borderColor: m3.primary, borderWidth: 2 },
+    metaText: { color: m3.onSurfaceVariant },
+    legend: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: scaled(6, s),
+      flexWrap: 'wrap',
+      paddingHorizontal: scaled(4, s),
+    },
+    legendSwatch: {
+      width: scaled(14, s),
+      height: scaled(14, s),
+      borderRadius: scaled(4, s),
+      borderWidth: 1,
+      borderColor: m3.outlineVariant,
+    },
+  });
+}
+
+function useStyles() {
+  const { scale, shape } = useM3();
+  return React.useMemo(() => createStyles(scale, shape), [scale, shape]);
+}

@@ -2,7 +2,8 @@ import React from 'react';
 import { Image, StyleSheet, Text, TextInput, View } from 'react-native';
 import { M3Button, M3Card, M3Touch } from './m3';
 import { deleteStoredImage, pickImageUri } from '../data/images';
-import { m3, m3type } from '../theme';
+import { m3, scaled } from '../theme';
+import { useM3 } from '../context/responsive';
 
 /** 整理券の状態。data層の TicketInfo.required に対応 (unknown は未設定)。 */
 export type TicketState = 'unknown' | 'none' | 'required';
@@ -15,18 +16,22 @@ export function today(): string {
 }
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const { type } = useM3();
+  const styles = useAdminStyles();
   return (
-    <M3Card variant="elevated" style={adminStyles.section}>
-      <Text style={[m3type.titleMedium, { color: m3.onSurface, marginBottom: 12 }]}>{title}</Text>
+    <M3Card variant="elevated" style={styles.section}>
+      <Text style={[type.titleMedium, styles.sectionTitle]}>{title}</Text>
       {children}
     </M3Card>
   );
 }
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const { type } = useM3();
+  const styles = useAdminStyles();
   return (
-    <View style={adminStyles.field}>
-      <Text style={[m3type.labelMedium, { color: m3.onSurfaceVariant, marginBottom: 4 }]}>{label}</Text>
+    <View style={styles.field}>
+      <Text style={[type.labelMedium, styles.fieldLabel]}>{label}</Text>
       {children}
     </View>
   );
@@ -41,14 +46,16 @@ export function Chips<T extends string>({
   value: T;
   onChange: (v: T) => void;
 }) {
+  const { type } = useM3();
+  const styles = useAdminStyles();
   return (
-    <View style={adminStyles.chips}>
+    <View style={styles.chips}>
       {options.map((o) => {
         const active = o.value === value;
         return (
           <M3Touch key={o.value} onPress={() => onChange(o.value)} label={o.label} round>
-            <View style={[adminStyles.chip, active && adminStyles.chipActive]}>
-              <Text style={[m3type.labelLarge, { color: active ? m3.onPrimaryContainer : m3.onSurfaceVariant }]}>
+            <View style={[styles.chip, active && styles.chipActive]}>
+              <Text style={[type.labelLarge, { color: active ? m3.onPrimaryContainer : m3.onSurfaceVariant }]}>
                 {o.label}
               </Text>
             </View>
@@ -67,6 +74,8 @@ export function ImageField({
   value: string | null | undefined;
   onChange: (uri: string | null) => void;
 }) {
+  const { type } = useM3();
+  const styles = useAdminStyles();
   const pick = async () => {
     try {
       const uri = await pickImageUri();
@@ -83,11 +92,11 @@ export function ImageField({
   };
   return (
     <View>
-      {value ? <Image source={{ uri: value }} style={adminStyles.imagePreview} resizeMode="cover" /> : null}
-      <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, marginBottom: 8 }]}>
+      {value ? <Image source={{ uri: value }} style={styles.imagePreview} resizeMode="cover" /> : null}
+      <Text style={[type.bodyMedium, styles.imageNote]}>
         Webでは画像が端末内に保存されるため、サイズが大きいと保存できない場合があります。小さめの画像を選んでください。
       </Text>
-      <View style={adminStyles.buttonRow}>
+      <View style={styles.buttonRow}>
         <M3Button label={value ? '画像を変更' : '画像を選ぶ'} icon="image" variant="tonal" onPress={pick} />
         {value ? <M3Button label="画像を削除" variant="outlined" onPress={remove} /> : null}
       </View>
@@ -95,61 +104,86 @@ export function ImageField({
   );
 }
 
-export const adminStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: m3.surface },
-  center: { flex: 1, backgroundColor: m3.surface, justifyContent: 'center', alignItems: 'center' },
-  contentWrap: { flex: 1 },
-  body: { padding: 16, gap: 12 },
-  searchWrap: { marginBottom: 4 },
-  section: { gap: 0 },
-  block: { gap: 4, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: m3.outlineVariant },
-  blockHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  field: { marginBottom: 8 },
-  input: {
-    backgroundColor: m3.surfaceContainerHigh,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: m3.onSurface,
-  },
-  multiline: { minHeight: 72, textAlignVertical: 'top' },
-  ioBox: { minHeight: 120, textAlignVertical: 'top', fontSize: 12 },
-  chips: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: m3.surfaceContainerHigh,
-  },
-  chipActive: { backgroundColor: m3.primaryContainer },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: m3.surfaceContainerLow,
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 8,
-  },
-  rowText: { flex: 1, gap: 2 },
-  rowActive: { borderWidth: 1, borderColor: m3.primary },
-  link: { color: m3.primary, paddingHorizontal: 8, paddingVertical: 4 },
-  danger: { color: m3.error, paddingHorizontal: 8, paddingVertical: 4 },
-  delayRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  delayInput: {
-    backgroundColor: m3.surfaceContainerHigh,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 15,
-    color: m3.onSurface,
-    width: 72,
-    textAlign: 'center',
-  },
-  timeRow: { flexDirection: 'row', gap: 8 },
-  timeField: { flex: 1 },
-  imagePreview: { width: '100%', height: 160, borderRadius: 12, marginBottom: 8 },
-  buttonRow: { flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' },
-  backWrap: { alignItems: 'flex-end' },
-});
+function createStyles(s: number) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: m3.surface },
+    center: { flex: 1, backgroundColor: m3.surface, justifyContent: 'center', alignItems: 'center' },
+    contentWrap: { flex: 1 },
+    body: { padding: scaled(16, s), gap: scaled(12, s) },
+    searchWrap: { marginBottom: scaled(4, s) },
+    section: { gap: 0 },
+    sectionTitle: { color: m3.onSurface, marginBottom: scaled(12, s) },
+    block: {
+      gap: scaled(4, s),
+      marginTop: scaled(12, s),
+      paddingTop: scaled(12, s),
+      borderTopWidth: 1,
+      borderTopColor: m3.outlineVariant,
+    },
+    blockHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    field: { marginBottom: scaled(8, s) },
+    fieldLabel: { color: m3.onSurfaceVariant, marginBottom: scaled(4, s) },
+    input: {
+      backgroundColor: m3.surfaceContainerHigh,
+      borderRadius: scaled(12, s),
+      paddingHorizontal: scaled(12, s),
+      paddingVertical: scaled(10, s),
+      fontSize: scaled(15, s),
+      color: m3.onSurface,
+    },
+    multiline: { minHeight: scaled(72, s), textAlignVertical: 'top' },
+    ioBox: { minHeight: scaled(120, s), textAlignVertical: 'top', fontSize: scaled(12, s) },
+    chips: { flexDirection: 'row', gap: scaled(8, s), flexWrap: 'wrap' },
+    chip: {
+      paddingHorizontal: scaled(16, s),
+      paddingVertical: scaled(8, s),
+      borderRadius: 999,
+      backgroundColor: m3.surfaceContainerHigh,
+    },
+    chipActive: { backgroundColor: m3.primaryContainer },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: scaled(12, s),
+      backgroundColor: m3.surfaceContainerLow,
+      borderRadius: scaled(16, s),
+      padding: scaled(12, s),
+      marginBottom: scaled(8, s),
+    },
+    rowText: { flex: 1, gap: scaled(2, s) },
+    rowActive: { borderWidth: 1, borderColor: m3.primary },
+    link: { color: m3.primary, paddingHorizontal: scaled(8, s), paddingVertical: scaled(4, s) },
+    danger: { color: m3.error, paddingHorizontal: scaled(8, s), paddingVertical: scaled(4, s) },
+    delayRow: { flexDirection: 'row', alignItems: 'center', gap: scaled(8, s) },
+    delayInput: {
+      backgroundColor: m3.surfaceContainerHigh,
+      borderRadius: scaled(12, s),
+      paddingHorizontal: scaled(12, s),
+      paddingVertical: scaled(8, s),
+      fontSize: scaled(15, s),
+      color: m3.onSurface,
+      width: scaled(72, s),
+      textAlign: 'center',
+    },
+    timeRow: { flexDirection: 'row', gap: scaled(8, s) },
+    timeField: { flex: 1 },
+    imagePreview: {
+      width: '100%',
+      height: scaled(160, s),
+      borderRadius: scaled(12, s),
+      marginBottom: scaled(8, s),
+    },
+    imageNote: { color: m3.onSurfaceVariant, marginBottom: scaled(8, s) },
+    buttonRow: { flexDirection: 'row', gap: scaled(8, s), marginTop: scaled(8, s), flexWrap: 'wrap' },
+    backWrap: { alignItems: 'flex-end' },
+  });
+}
+
+/** 基準幅 (390px) の静的スタイル。admin 画面の既存 import との互換用。 */
+export const adminStyles = createStyles(1);
+
+/** 画面幅に応じてスケールした admin スタイル。 */
+export function useAdminStyles() {
+  const { scale } = useM3();
+  return React.useMemo(() => createStyles(scale), [scale]);
+}

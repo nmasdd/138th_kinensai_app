@@ -1,16 +1,27 @@
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
 import { loadJSON, saveJSON } from './kvStore';
+import { useContentEffect } from '../context/useContentRefreshKey';
 import type { StageItem } from './timetable';
+import stageGroupsJson from './bundled/stage-groups.json';
+import auditoriumGroupsJson from './bundled/auditorium-groups.json';
 
+/**
+ * 出演団体。ステージ (野外ステージ) と講堂でデータを分けて管理する。
+ * 詳細モーダルで紹介文・写真を表示するため、`detail` (短い紹介) とは別に
+ * `intro` (モーダル用の長い紹介文) を持つ。
+ */
 export interface StageGroup {
   id: string;
   name: string;
   detail: string;
+  /** 詳細モーダル用の長い紹介文。未設定なら detail を使う */
+  intro?: string;
+  /** 所属・活動ジャンルなどの短い見出し (任意) */
+  genre?: string;
   /** 管理者ページで登録した画像 (file:// URI または dataURL)。なければ null */
   imageUri?: string | null;
-  /** ステージ演目の曜日 (0=土, 1=日)。未定なら undefined */
+  /** 演目の曜日 (0=土, 1=日)。未定なら undefined */
   day?: number;
   /** 開始時刻 "HH:MM"。未定なら undefined */
   start?: string;
@@ -21,18 +32,18 @@ export interface StageGroup {
 }
 
 /**
- * ステージ出演団体。日時が確定しているものは講堂と同じ時間割として描画する。
+ * ステージ (野外ステージ) 出演団体。日時が確定しているものは
+ * タイムテーブルの時間割として描画する。
  * 本データが来たらここを差し替える (現在は動作確認用サンプル)。
  */
-export const bundledGroups: StageGroup[] = [
-  { id: 'group-a', name: '吹奏楽部', detail: 'クラシックからポップスまで幅広く演奏します。', day: 0, start: '12:15', end: '12:45' },
-  { id: 'group-b', name: '合唱部', detail: '混声合唱で名曲をお届けします。', day: 0, start: '12:55', end: '13:25' },
-  { id: 'group-c', name: 'ダンス部', detail: '迫力のステージパフォーマンス。', day: 0, start: '13:35', end: '14:10' },
-  { id: 'group-d', name: '軽音楽部', detail: 'バンドサウンドで会場を盛り上げます。', day: 0, start: '14:20', end: '15:00' },
-  { id: 'group-e', name: '弦楽部', detail: '弦楽合奏をお楽しみください。', day: 1, start: '09:15', end: '09:45' },
-  { id: 'group-f', name: '演劇部', detail: 'オリジナル短編を上演します。', day: 1, start: '09:55', end: '10:35' },
-  { id: 'group-g', name: 'コーラス部', detail: 'みんなで歌う企画もあります。', day: 1, start: '10:45', end: '11:15' },
-];
+export const bundledGroups: StageGroup[] = stageGroupsJson as StageGroup[];
+
+/**
+ * 講堂出演団体。時間割は time/Auditorium.csv (講堂タイムテーブル) を正とし、
+ * ここには詳細モーダル用の紹介文・ジャンルなどのメタ情報を持たせる。
+ * 同じ団体名が両方にあれば講堂タブで紹介文を表示できる。
+ */
+export const bundledAuditoriumGroups: StageGroup[] = auditoriumGroupsJson as StageGroup[];
 
 /**
  * 日時が確定している出演団体をタイムテーブル用の演目に変換する。
@@ -58,30 +69,41 @@ export function groupStageItems(groups: StageGroup[]): StageItem[] {
 
 const VOTES_FILE = `${FileSystem.documentDirectory}stage-votes.json`;
 const GROUPS_KEY = 'stage-groups.json';
+const AUDITORIUM_GROUPS_KEY = 'auditorium-groups.json';
 
-async function loadGroups(): Promise<StageGroup[]> {
-  const parsed = await loadJSON<unknown>(GROUPS_KEY, null);
+async function loadGroupsOf(key: string, fallback: StageGroup[]): Promise<StageGroup[]> {
+  const parsed = await loadJSON<unknown>(key, null);
   if (Array.isArray(parsed)) return parsed as StageGroup[];
-  return bundledGroups;
+  return fallback;
 }
 
-/** 管理者ページから出演団体一覧を保存する */
+/** 管理者ページからステージ出演団体一覧を保存する */
 export async function saveStageGroups(groups: StageGroup[]): Promise<void> {
   await saveJSON(GROUPS_KEY, groups);
 }
 
-export function useStageGroups() {
-  const [groups, setGroups] = useState<StageGroup[]>(bundledGroups);
+/** 管理者ページから講堂出演団体一覧を保存する */
+export async function saveAuditoriumGroups(groups: StageGroup[]): Promise<void> {
+  await saveJSON(AUDITORIUM_GROUPS_KEY, groups);
+}
+
+/**
+ * 出演団体の一覧を読み込む。`kind` でステージ/講堂を切り替える。
+ * 表示のたびに再読込して管理者の保存を即反映する。
+ */
+export function usePerformerGroups(kind: 'stage' | 'auditorium' = 'stage') {
+  const fallback = kind === 'auditorium' ? bundledAuditoriumGroups : bundledGroups;
+  const key = kind === 'auditorium' ? AUDITORIUM_GROUPS_KEY : GROUPS_KEY;
+  const [groups, setGroups] = useState<StageGroup[]>(fallback);
   const [votedId, setVotedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 管理者ページの保存を即反映するため、表示のたびに再読込する
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      (async () => {
+  // 管理者ページの保存・公開コンテンツの更新・画面フォーカスで再読込する
+  useContentEffect(() => {
+    let cancelled = false;
+    (async () => {
       const [loadedGroups, savedVote] = await Promise.all([
-        loadGroups(),
+        loadGroupsOf(key, fallback),
         (async () => {
           try {
             if (!FileSystem.documentDirectory) return null;
@@ -103,8 +125,7 @@ export function useStageGroups() {
     return () => {
       cancelled = true;
     };
-    }, []),
-  );
+  }, [key, fallback]);
 
   const vote = useCallback((id: string) => {
     setVotedId(id);
@@ -115,4 +136,32 @@ export function useStageGroups() {
   }, []);
 
   return { groups, votedId, vote, isLoading };
+}
+
+/** 後方互換: ステージ出演団体のフック。 */
+export function useStageGroups() {
+  return usePerformerGroups('stage');
+}
+
+/**
+ * 講堂の演目名 (Auditorium.csv) と講堂出演団体メタ情報を突き合わせて
+ * 紹介文付きの団体を返す。メタ情報がない演目は名前のみの団体として返す。
+ */
+export function auditoriumGroupsForItems(items: StageItem[], meta: StageGroup[]): StageGroup[] {
+  const byName = new Map(meta.map((g) => [g.name, g]));
+  const seen = new Set<string>();
+  const out: StageGroup[] = [];
+  for (const it of items) {
+    if (seen.has(it.team)) continue;
+    seen.add(it.team);
+    const m = byName.get(it.team);
+    out.push(
+      m ?? {
+        id: `aud-${it.team}`,
+        name: it.team,
+        detail: '紹介文は準備中です。',
+      },
+    );
+  }
+  return out;
 }

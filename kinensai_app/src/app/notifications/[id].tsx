@@ -5,10 +5,13 @@ import { useLocalSearchParams } from 'expo-router';
 import { M3Button, M3LoadingView, TopAppBar, goBackOrHome } from '../../components/m3';
 import { ScreenFade } from '../../components/anim';
 import { loadNotifications, type AppNotification } from '../../data/notifications';
-import { m3, m3type } from '../../theme';
+import { m3, scaled } from '../../theme';
+import { useM3 } from '../../context/responsive';
 
 export default function NotificationDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const { type } = useM3();
+  const styles = useStyles();
   const [item, setItem] = useState<AppNotification | null | undefined>(undefined);
   const insets = useSafeAreaInsets();
 
@@ -40,11 +43,11 @@ export default function NotificationDetailScreen() {
         <View style={styles.body}>
           {item ? (
             <>
-              <Text style={[m3type.labelMedium, { color: m3.onSurfaceVariant, marginBottom: 12 }]}>{item.date}</Text>
-              <Text style={[m3type.bodyLarge, { color: m3.onSurface, textAlign: 'center' }]}>{item.body}</Text>
+              <Text style={[type.labelMedium, { color: m3.onSurfaceVariant, marginBottom: 12 }]}>{item.date}</Text>
+              <Text style={[type.bodyLarge, { color: m3.onSurface, textAlign: 'center' }]}>{item.body}</Text>
             </>
           ) : (
-            <Text style={[m3type.bodyLarge, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
+            <Text style={[type.bodyLarge, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
               この通知は見つかりませんでした。
             </Text>
           )}
@@ -57,9 +60,16 @@ export default function NotificationDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: m3.surface },
-  center: { flex: 1, backgroundColor: m3.surface },
-  body: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  backWrap: { alignItems: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
-});
+function createStyles(s: number) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: m3.surface },
+    center: { flex: 1, backgroundColor: m3.surface },
+    body: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: scaled(24, s) },
+    backWrap: { alignItems: 'flex-end', paddingHorizontal: scaled(16, s), paddingBottom: scaled(16, s) },
+  });
+}
+
+function useStyles() {
+  const { scale } = useM3();
+  return React.useMemo(() => createStyles(scale), [scale]);
+}

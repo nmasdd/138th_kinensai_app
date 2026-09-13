@@ -1,8 +1,7 @@
-import { loadAllClassContent } from './classContent';
+import { CLASS_CATALOG, loadAllClassContent } from './classContent';
 import { loadTicketMap } from './tickets';
 import { loadVolunteers } from './volunteers';
 import { loadJSON, saveJSON } from './kvStore';
-import catalog from './classCatalog.json';
 
 export interface Exhibition {
   id: string;
@@ -20,16 +19,7 @@ export interface Exhibition {
   imageUri?: string | null;
 }
 
-interface CatalogEntry {
-  id: string;
-  className: string;
-  title: string;
-  detail: string;
-  place: string | null;
-  kind: string;
-}
-
-const CATALOG = catalog as CatalogEntry[];
+const CATALOG = CLASS_CATALOG;
 
 /** クラス企画の管理者上書き (タイトル・説明・場所・画像)。同梱カタログより優先される */
 export interface ClassOverride {
@@ -88,17 +78,16 @@ export function suggestClassId(className: string, existingIds: string[]): string
 }
 
 /**
- * classCatalog.json を正本として企画一覧を作る。
- * planning txt はフォールバック (カタログの title/detail が空のときのみ使う)。
+ * クラス企画の同梱正本 (`bundled/class-catalog.json`) を基に企画一覧を作る。
  * 管理者の上書き・カスタム追加・整理券情報は結合される。
  */
 export async function loadExhibitions(): Promise<Exhibition[]> {
-  const [content, ticketMap, overrides, custom] = await Promise.all([
-    loadAllClassContent().catch(() => ({}) as Record<string, { title: string; detail: string }>),
+  const [ticketMap, overrides, custom] = await Promise.all([
     loadTicketMap(),
     loadClassOverrides(),
     loadCustomClasses(),
   ]);
+  const content = loadAllClassContent();
   const classes: Exhibition[] = CATALOG.filter((c) => c.kind === 'class').map((c) => {
     const ticket = ticketMap[c.id];
     const ov = overrides[c.id];

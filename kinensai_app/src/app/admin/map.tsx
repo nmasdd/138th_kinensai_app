@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { M3Button, M3LoadingView, M3PrimaryTabs, M3Touch, TopAppBar } from '../../components/m3';
 import { AdminNotice, AdminSaveBar, useAdminNotice } from '../../components/AdminSaveBar';
-import { Chips, Field, Section, adminStyles } from '../../components/adminUi';
+import { Chips, Field, Section, useAdminStyles } from '../../components/adminUi';
 import { AdminGate } from '../../components/AdminGuard';
 import { VectorMapView } from '../../components/VectorMapView';
 import { VECTOR_FLOORS, VECTOR_ROOMS, type VectorRoom } from '../../data/vectorMap';
 import { loadMapLayout, saveMapLayout, type MapLayoutOverrides } from '../../data/mapLayout';
-import { m3, m3type } from '../../theme';
+import { m3, scaled } from '../../theme';
+import { useM3 } from '../../context/responsive';
 
 /**
  * 管理者用・マップ配置 (/admin/map)。
@@ -48,9 +49,12 @@ function NumField({
   min: number;
   onChange: (n: number) => void;
 }) {
+  const { type } = useM3();
+  const adminStyles = useAdminStyles();
+  const styles = useStyles();
   return (
     <View style={styles.numField}>
-      <Text style={[m3type.labelMedium, { color: m3.onSurfaceVariant }]}>{label}</Text>
+      <Text style={[type.labelMedium, { color: m3.onSurfaceVariant }]}>{label}</Text>
       <TextInput
         style={adminStyles.input}
         value={String(value)}
@@ -74,6 +78,9 @@ export default function AdminMapScreen() {
 }
 
 function AdminMapContent() {
+  const { type } = useM3();
+  const adminStyles = useAdminStyles();
+  const styles = useStyles();
   const [tab, setTab] = useState(0);
   const [working, setWorking] = useState<Record<string, VectorRoom[]>>(() => {
     const init: Record<string, VectorRoom[]> = {};
@@ -83,7 +90,6 @@ function AdminMapContent() {
   const [overridden, setOverridden] = useState<Set<string>>(() => new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [blinkAnim] = useState(() => new Animated.Value(1));
   const { notice, showOk, showErr } = useAdminNotice();
 
   const floor = VECTOR_FLOORS[tab];
@@ -209,7 +215,7 @@ function AdminMapContent() {
       <TopAppBar title="管理者用・マップ配置" />
       <View style={adminStyles.contentWrap}>
         <ScrollView contentContainerStyle={[adminStyles.body, { paddingBottom: MAP_FOOTER_SPACE }]}>
-          <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>
+          <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
             フロア地図で部屋をタップして選び、下の一覧または地図タップで位置を調整します。
             地図の何もない場所をタップすると、選択中の部屋がその位置へ移動します。
           </Text>
@@ -219,8 +225,6 @@ function AdminMapContent() {
           <VectorMapView
             floor={floor}
             selectedId={selectedId}
-            blinkId={null}
-            blinkAnim={blinkAnim}
             locId={null}
             selfPos={null}
             roomsOverride={rooms}
@@ -236,7 +240,7 @@ function AdminMapContent() {
                 <M3Touch key={r.id} onPress={() => setSelectedId(r.id)} label={`${r.name}を選択`} round>
                   <View style={[styles.roomChip, active && styles.roomChipActive]}>
                     <Text
-                      style={[m3type.labelMedium, { color: active ? m3.onPrimaryContainer : m3.onSurface }]}
+                      style={[type.labelMedium, { color: active ? m3.onPrimaryContainer : m3.onSurface }]}
                       numberOfLines={1}
                     >
                       {r.label || r.name}
@@ -295,7 +299,7 @@ function AdminMapContent() {
               </View>
             </Section>
           ) : (
-            <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>
+            <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
               部屋を選択すると編集できます。
             </Text>
           )}
@@ -325,18 +329,25 @@ function AdminMapContent() {
   );
 }
 
-const styles = StyleSheet.create({
-  roomChips: { gap: 8, paddingVertical: 4 },
-  roomChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: m3.surfaceContainerHigh,
-    maxWidth: 120,
-  },
-  roomChipActive: { backgroundColor: m3.primaryContainer },
-  numGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  numField: { flexGrow: 1, flexBasis: 120, gap: 2 },
-  nudgeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  nudgeBtn: { flex: 1, minWidth: 0 },
-});
+function createStyles(s: number) {
+  return StyleSheet.create({
+    roomChips: { gap: scaled(8, s), paddingVertical: scaled(4, s) },
+    roomChip: {
+      paddingHorizontal: scaled(12, s),
+      paddingVertical: scaled(6, s),
+      borderRadius: 999,
+      backgroundColor: m3.surfaceContainerHigh,
+      maxWidth: scaled(120, s),
+    },
+    roomChipActive: { backgroundColor: m3.primaryContainer },
+    numGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: scaled(8, s) },
+    numField: { flexGrow: 1, flexBasis: scaled(120, s), gap: scaled(2, s) },
+    nudgeRow: { flexDirection: 'row', gap: scaled(8, s), flexWrap: 'wrap' },
+    nudgeBtn: { flex: 1, minWidth: 0 },
+  });
+}
+
+function useStyles() {
+  const { scale } = useM3();
+  return React.useMemo(() => createStyles(scale), [scale]);
+}

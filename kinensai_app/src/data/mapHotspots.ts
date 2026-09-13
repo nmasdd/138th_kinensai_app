@@ -7,7 +7,7 @@
  * 代表 id のマーカー1件に `sharedIds` で同居企画をぶら下げ、
  * 同一座標への重ね置きを避ける (ずらし配置は誤タップを招くため採用しない)。
  *
- * 対応付け根拠: ベクター部屋名表示と src/data/classCatalog.json の id
+ * 対応付け根拠: ベクター部屋名表示と src/data/bundled/class-catalog.json の id
  * および src/data/volunteers.ts の place。高校HR教室 (1A〜1J・2A〜2J)
  * は全20教室を登録済み。部活系はベクター上に部屋ブロックとして描画され、
  * place 文字列で一意に特定できるもののみ登録し、講堂・中庭・事務室前・
@@ -21,7 +21,7 @@
 export type MapFloor = '1階' | '2階' | '3階' | '4階 5階';
 
 export interface MapHotspot {
-  /** 代表となる Exhibition の id (classCatalog.json / volunteers.ts の id) */
+  /** 代表となる Exhibition の id (bundled/class-catalog.json / volunteers.ts の id) */
   id: string;
   floor: MapFloor;
   /** ベクター幅に対する 0〜1 の相対 x 座標 */

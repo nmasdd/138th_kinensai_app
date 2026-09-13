@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { M3EmptyState, M3Icon, M3LoadingView, M3PrimaryTabs, M3SearchBar, M3Touch, TopAppBar } from '../../components/m3';
 import { Rise, ScreenFade, Stagger } from '../../components/anim';
+import { useContentEffect } from '../../context/useContentRefreshKey';
 import { VectorMapView } from '../../components/VectorMapView';
 import ExhibitionDetailModal from '../../components/ExhibitionDetailModal';
 import { loadAllExhibitions, type Exhibition } from '../../data/exhibitions';
@@ -11,7 +12,8 @@ import { useFavorites } from '../../data/favorites';
 import { hotspotForExhibitionId } from '../../data/mapHotspots';
 import { VECTOR_FLOORS, type VectorFloor } from '../../data/vectorMap';
 import { loadMapLayout, type MapLayoutOverrides } from '../../data/mapLayout';
-import { m3, m3shape, m3type } from '../../theme';
+import { useM3 } from '../../context/responsive';
+import { m3, scaled, type M3Shape } from '../../theme';
 
 const FLOOR_LABELS = VECTOR_FLOORS;
 
@@ -64,8 +66,11 @@ function floorIndexForExhibition(ex: Exhibition): number {
 }
 
 export default function MapScreen() {
-  const { loc, floor: floorParam, x: xParam, y: yParam } = useLocalSearchParams<{
+  const { type } = useM3();
+  const styles = useStyles();
+  const { loc, focus, floor: floorParam, x: xParam, y: yParam } = useLocalSearchParams<{
     loc?: string;
+    focus?: string;
     floor?: string;
     x?: string;
     y?: string;
@@ -79,10 +84,6 @@ export default function MapScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const { isFavorite, toggle } = useFavorites();
   const scrollRef = useRef<ScrollView>(null);
-  const [blinkAnim] = useState(() => new Animated.Value(1));
-  const blinkAnimRef = useRef<Animated.CompositeAnimation | null>(null);
-  const [blinkId, setBlinkId] = useState<string | null>(null);
-  const mountedRef = useRef(true);
   const appliedFloorRef = useRef<string | null>(null);
 
   const floorParamRaw = firstParam(floorParam);
@@ -99,46 +100,45 @@ export default function MapScreen() {
     if (rx < 0 || rx > 1 || ry < 0 || ry > 1) return null;
     return { x: rx, y: ry };
   }, [xParam, yParam]);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      blinkAnimRef.current?.stop();
-      blinkAnimRef.current = null;
-    };
-  }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      // URL で階が指定されていれば、その階へ切り替える (手動切替は尊重)
-      if (floorIndexFromParam >= 0 && appliedFloorRef.current !== floorParamRaw) {
-        appliedFloorRef.current = floorParamRaw ?? null;
-        setTab(floorIndexFromParam);
-      }
-      loadMapLayout()
-        .then((layout) => {
-          if (!cancelled) setMapLayout(layout);
-        })
-        .catch(() => {});
-      loadAllExhibitions()
-        .catch(() => [])
-        .then((list) => {
-          if (cancelled) return;
-          setExhibitions(list);
-          if (typeof loc === 'string' && loc.length > 0) {
-            const hit = list.find((e) => loc.includes(e.id) || loc.includes(e.className));
-            if (hit) setSelectedId(hit.id);
+  useContentEffect(() => {
+    let cancelled = false;
+    // URL で階が指定されていれば、その階へ切り替える (手動切替は尊重)
+    if (floorIndexFromParam >= 0 && appliedFloorRef.current !== floorParamRaw) {
+      appliedFloorRef.current = floorParamRaw ?? null;
+      setTab(floorIndexFromParam);
+    }
+    loadMapLayout()
+      .then((layout) => {
+        if (!cancelled) setMapLayout(layout);
+      })
+      .catch(() => {});
+    loadAllExhibitions()
+      .catch(() => [])
+      .then((list) => {
+        if (cancelled) return;
+        setExhibitions(list);
+        // 検索の詳細「マップを開く」: 指定企画を選択し、その階へ切り替える
+        const focusId = typeof focus === 'string' && focus.length > 0 ? focus : null;
+        if (focusId) {
+          const hit = list.find((e) => e.id === focusId);
+          if (hit) {
+            setSelectedId(hit.id);
+            const idx = floorIndexForExhibition(hit);
+            if (idx >= 0) setTab(idx);
           }
-        })
-        .finally(() => {
-          if (!cancelled) setIsLoading(false);
-        });
-      return () => {
-        cancelled = true;
-      };
-    }, [loc, floorIndexFromParam, floorParamRaw]),
-  );
+        } else if (typeof loc === 'string' && loc.length > 0) {
+          const hit = list.find((e) => loc.includes(e.id) || loc.includes(e.className));
+          if (hit) setSelectedId(hit.id);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loc, focus, floorIndexFromParam, floorParamRaw]);
 
   const selected = exhibitions.find((e) => e.id === selectedId) ?? null;
 
@@ -165,31 +165,10 @@ export default function MapScreen() {
     });
   }, [exhibitions, query, tab]);
 
-  const floor = FLOOR_LABELS[tab];
+  // お気に入り企画 (検索クエリで絞り込み済みの places から)
+  const favoritePlaces = useMemo(() => places.filter((ex) => isFavorite(ex.id)), [places, isFavorite]);
 
-  const startBlink = useCallback(
-    (id: string) => {
-      blinkAnimRef.current?.stop();
-      blinkAnim.setValue(1);
-      setBlinkId(id);
-      const dim = { toValue: 0.2, duration: 180, useNativeDriver: true } as const;
-      const lit = { toValue: 1, duration: 180, useNativeDriver: true } as const;
-      const seq = Animated.sequence([
-        Animated.timing(blinkAnim, dim),
-        Animated.timing(blinkAnim, lit),
-        Animated.timing(blinkAnim, dim),
-        Animated.timing(blinkAnim, lit),
-        Animated.timing(blinkAnim, dim),
-        Animated.timing(blinkAnim, lit),
-      ]);
-      blinkAnimRef.current = seq;
-      seq.start(({ finished }) => {
-        blinkAnimRef.current = null;
-        if (finished && mountedRef.current) setBlinkId(null);
-      });
-    },
-    [blinkAnim],
-  );
+  const floor = FLOOR_LABELS[tab];
 
   const selectPlace = useCallback(
     (ex: Exhibition) => {
@@ -197,9 +176,23 @@ export default function MapScreen() {
       scrollRef.current?.scrollTo({ y: 0, animated: true });
       const idx = floorIndexForExhibition(ex);
       if (idx >= 0) setTab(idx);
-      startBlink(ex.id);
     },
-    [startBlink],
+    [],
+  );
+
+  const renderPlace = (ex: Exhibition, index: number) => (
+    <Stagger key={ex.id} index={index % 10}>
+      <M3Touch onPress={() => selectPlace(ex)} label={`${ex.className}の詳細を地図に表示`} round>
+        <View style={[styles.place, selectedId === ex.id && styles.placeActive]}>
+          <Text style={[type.labelLarge, styles.placeBadge]}>{ex.className}</Text>
+          <Text style={[type.bodyLarge, { color: m3.onSurface, flex: 1 }]} numberOfLines={1}>
+            {ex.projectName || '(タイトル未定)'}
+          </Text>
+          {isFavorite(ex.id) ? <M3Icon name="star" size={18} color={m3.primary} /> : null}
+          <M3Icon name="chevron-right" size={20} color={m3.onSurfaceVariant} />
+        </View>
+      </M3Touch>
+    </Stagger>
   );
 
   const selectHotspot = useCallback((id: string) => {
@@ -218,21 +211,19 @@ export default function MapScreen() {
           <VectorMapView
             floor={floor}
             selectedId={selectedId}
-            blinkId={blinkId}
-            blinkAnim={blinkAnim}
             locId={locExhibition?.id ?? locText}
             selfPos={selfRel && (floorIndexFromParam < 0 || floorIndexFromParam === tab) ? selfRel : null}
             roomsOverride={mapLayout[floor]}
             onSelect={selectHotspot}
           />
         </ScreenFade>
-        <Text style={[m3type.bodyMedium, styles.hint]} accessibilityLiveRegion="polite">
+        <Text style={[type.bodyMedium, styles.hint]} accessibilityLiveRegion="polite">
           ドラッグで移動・ピンチ/ホイール/＋−で拡大縮小・部屋タップで詳細表示
         </Text>
         {locText && (
           <Rise>
             <View style={styles.locBanner} accessibilityLiveRegion="polite">
-              <Text style={[m3type.bodyMedium, { color: m3.onPrimaryContainer, textAlign: 'center' }]}>
+              <Text style={[type.bodyMedium, { color: m3.onPrimaryContainer, textAlign: 'center' }]}>
                 QR読取位置: {selected ? `${selected.className}付近` : locText}
               </Text>
             </View>
@@ -242,7 +233,7 @@ export default function MapScreen() {
           <Rise>
             <View style={[styles.locBanner, styles.selfBanner]} accessibilityLiveRegion="polite">
               <M3Icon name="my-location" size={16} color={m3.onPrimaryContainer} />
-              <Text style={[m3type.bodyMedium, { color: m3.onPrimaryContainer }]}>
+              <Text style={[type.bodyMedium, { color: m3.onPrimaryContainer }]}>
                 現在地: {FLOOR_LABELS[floorIndexFromParam >= 0 ? floorIndexFromParam : tab]} 付近
               </Text>
             </View>
@@ -252,56 +243,51 @@ export default function MapScreen() {
           <View style={styles.detailBox}>
           {selected ? (
             <>
-              <Text style={[m3type.titleMedium, { color: m3.onSurface }]}>
+              <Text style={[type.titleMedium, { color: m3.onSurface }]}>
                 {selected.className} {selected.projectName}
               </Text>
-              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 4 }]} numberOfLines={3}>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 4 }]} numberOfLines={3}>
                 {selected.description || '補足テキストがここに入ります。'}
               </Text>
               {coLocated.map((ex) => (
                 <M3Touch key={ex.id} onPress={() => setSelectedId(ex.id)} label={`同じ教室の企画 ${ex.className} を表示`} round>
-                  <Text style={[m3type.labelLarge, styles.coLocatedLink]} numberOfLines={1}>
+                  <Text style={[type.labelLarge, styles.coLocatedLink]} numberOfLines={1}>
                     同じ教室の企画: {ex.className} {ex.projectName || '(タイトル未定)'}
                   </Text>
                 </M3Touch>
               ))}
               <M3Touch onPress={() => setModalVisible(true)} label="詳細を開く" round>
-                <Text style={[m3type.labelLarge, styles.detailLink]}>詳細を見る</Text>
+                <Text style={[type.labelLarge, styles.detailLink]}>詳細を見る</Text>
               </M3Touch>
             </>
           ) : (
-            <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>一覧から場所を選ぶとここに詳細を表示します。</Text>
+            <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>一覧から場所を選ぶとここに詳細を表示します。</Text>
           )}
           </View>
         </Rise>
         <Rise delay={60}>
-          <Text style={[m3type.titleSmall, { color: m3.onSurface }]} accessibilityRole="header">
-            企画が行われている場所
+          <Text style={[type.titleSmall, { color: m3.onSurface }]} accessibilityRole="header">
+            お気に入り企画
           </Text>
         </Rise>
-        {isLoading ? (
-          <M3LoadingView />
+        {isLoading ? null : favoritePlaces.length === 0 ? (
+          <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
+            お気に入りに登録した企画がここに表示されます
+          </Text>
         ) : (
-          places.map((ex, index) => (
-            <Stagger key={ex.id} index={index % 10}>
-              <M3Touch onPress={() => selectPlace(ex)} label={`${ex.className}の詳細を地図に表示`} round>
-              <Animated.View style={blinkId === ex.id ? { opacity: blinkAnim } : undefined}>
-                <View style={[styles.place, selectedId === ex.id && styles.placeActive, blinkId === ex.id && styles.placeFlash]}>
-                  <Text style={[m3type.labelLarge, styles.placeBadge]}>{ex.className}</Text>
-                  <Text style={[m3type.bodyLarge, { color: m3.onSurface, flex: 1 }]} numberOfLines={1}>
-                    {ex.projectName || '(タイトル未定)'}
-                  </Text>
-                  <M3Icon name="chevron-right" size={20} color={m3.onSurfaceVariant} />
-                </View>
-              </Animated.View>
-              </M3Touch>
-            </Stagger>
-          ))
+          favoritePlaces.map((ex, index) => renderPlace(ex, index))
         )}
+
+        <Rise delay={60}>
+          <Text style={[type.titleSmall, { color: m3.onSurface }]} accessibilityRole="header">
+            企画一覧
+          </Text>
+        </Rise>
+        {isLoading ? <M3LoadingView /> : places.map((ex, index) => renderPlace(ex, index))}
         {places.length === 0 && !isLoading && (
           <M3EmptyState icon="map">
-            <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
-              一致する場所がありません
+            <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
+              一致する企画がありません
             </Text>
           </M3EmptyState>
         )}
@@ -320,33 +306,48 @@ export default function MapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: m3.surface },
-  body: { padding: 16, gap: 12, paddingBottom: 16 },
-  hint: { color: m3.onSurfaceVariant, textAlign: 'center' },
-  coLocatedLink: { color: m3.primary, marginTop: 8 },
-  locBanner: { backgroundColor: m3.primaryContainer, borderRadius: m3shape.card, padding: 12 },
-  selfBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  detailBox: { backgroundColor: m3.surfaceContainerHigh, borderRadius: m3shape.dialog, padding: 20, minHeight: 200 },
-  detailLink: { color: m3.primary, marginTop: 8 },
-  place: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: m3.surfaceContainerLow,
-    borderRadius: m3shape.card,
-    padding: 12,
-    minHeight: 44,
-  },
-  placeActive: { borderWidth: 2, borderColor: m3.primary },
-  placeFlash: { borderWidth: 2, borderColor: m3.primary, backgroundColor: m3.primaryContainer },
-  placeBadge: {
-    color: m3.onSecondaryContainer,
-    backgroundColor: m3.secondaryContainer,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: m3shape.pill,
-    overflow: 'hidden',
-  },
-  searchWrap: { paddingHorizontal: 16, paddingBottom: 16, paddingTop: 4 },
-});
+function createStyles(s: number, shape: M3Shape) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: m3.surface },
+    body: { padding: scaled(16, s), gap: scaled(12, s), paddingBottom: scaled(16, s) },
+    hint: { color: m3.onSurfaceVariant, textAlign: 'center' },
+    coLocatedLink: { color: m3.primary, marginTop: scaled(8, s) },
+    locBanner: { backgroundColor: m3.primaryContainer, borderRadius: shape.card, padding: scaled(12, s) },
+    selfBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scaled(6, s) },
+    detailBox: {
+      backgroundColor: m3.surfaceContainerHigh,
+      borderRadius: shape.dialog,
+      padding: scaled(20, s),
+      minHeight: scaled(200, s),
+    },
+    detailLink: { color: m3.primary, marginTop: scaled(8, s) },
+    place: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: scaled(12, s),
+      backgroundColor: m3.surfaceContainerLow,
+      borderRadius: shape.card,
+      padding: scaled(12, s),
+      minHeight: scaled(44, s),
+    },
+    placeActive: { borderWidth: 2, borderColor: m3.primary },
+    placeBadge: {
+      color: m3.onSecondaryContainer,
+      backgroundColor: m3.secondaryContainer,
+      paddingHorizontal: scaled(12, s),
+      paddingVertical: scaled(4, s),
+      borderRadius: shape.pill,
+      overflow: 'hidden',
+    },
+    searchWrap: {
+      paddingHorizontal: scaled(16, s),
+      paddingBottom: scaled(16, s),
+      paddingTop: scaled(4, s),
+    },
+  });
+}
+
+function useStyles() {
+  const { scale, shape } = useM3();
+  return React.useMemo(() => createStyles(scale, shape), [scale, shape]);
+}

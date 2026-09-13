@@ -1,13 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { M3Card, M3EmptyState, M3FAB, M3FilterChip, M3Icon, M3ImagePlaceholder, M3LoadingView, M3SearchBar, TopAppBar } from '../../components/m3';
 import { Rise, ScreenFade, Stagger } from '../../components/anim';
 import ExhibitionDetailModal from '../../components/ExhibitionDetailModal';
 import { loadAllExhibitions, type Exhibition } from '../../data/exhibitions';
 import { useFavorites } from '../../data/favorites';
-import { m3, m3type } from '../../theme';
+import { useM3 } from '../../context/responsive';
+import { useContentEffect } from '../../context/useContentRefreshKey';
+import { m3, scaled } from '../../theme';
 
 type KindFilter = 'all' | 'class' | 'volunteer' | 'mogiten' | 'fav';
 
@@ -24,6 +26,8 @@ function isMogiten(ex: Exhibition): boolean {
 }
 
 export default function SearchScreen() {
+  const { type } = useM3();
+  const styles = useStyles();
   const { filter, exhibit } = useLocalSearchParams<{ filter?: string; exhibit?: string | string[] }>();
   const [exhibitions, setExhibitions] = useState<Exhibition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,29 +42,27 @@ export default function SearchScreen() {
   // 画面に再フォーカスしたらリセットし、再訪時は同じ target でも開き直せるようにする。
   const openedExhibitRef = useRef<string | null>(null);
 
-  // 管理者ページの保存を即反映するため、表示のたびに再読込する
+  // 管理者ページの保存・公開コンテンツの更新を即反映する
   // QuickNav/メニューからの再訪でも filter/exhibit を同期する
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      openedExhibitRef.current = null;
-      if (filter === 'mogiten') {
-        setKind('mogiten');
-        setFilterOpen(true);
-      }
-      loadAllExhibitions()
-        .catch(() => [])
-        .then((list) => {
-          if (!cancelled) setExhibitions(list);
-        })
-        .finally(() => {
-          if (!cancelled) setIsLoading(false);
-        });
-      return () => {
-        cancelled = true;
-      };
-    }, [filter]),
-  );
+  useContentEffect(() => {
+    let cancelled = false;
+    openedExhibitRef.current = null;
+    if (filter === 'mogiten') {
+      setKind('mogiten');
+      setFilterOpen(true);
+    }
+    loadAllExhibitions()
+      .catch(() => [])
+      .then((list) => {
+        if (!cancelled) setExhibitions(list);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filter]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -144,7 +146,7 @@ export default function SearchScreen() {
       )}
       <Rise delay={40}>
         <View style={styles.resultInfo}>
-          <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]} accessibilityLiveRegion="polite">
+          <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]} accessibilityLiveRegion="polite">
             {query.trim() ? `検索結果: ${sorted.length}件` : `全 ${sorted.length} 件の企画`}
           </Text>
         </View>
@@ -173,19 +175,19 @@ export default function SearchScreen() {
               )}
               <View style={styles.cardBody}>
                 <View style={styles.cardTitleRow}>
-                  <Text style={[m3type.titleMedium, { color: m3.onSurface, flex: 1 }]} numberOfLines={1}>
+                  <Text style={[type.titleMedium, { color: m3.onSurface, flex: 1 }]} numberOfLines={1}>
                     {item.className} {item.projectName ? `(${item.projectName})` : '(タイトル)'}
                   </Text>
                   {isFavorite(item.id) ? <M3Icon name="star" size={20} color={m3.primary} /> : null}
                 </View>
-                <Text style={[m3type.labelLarge, styles.openHint]}>詳細を開く</Text>
+                <Text style={[type.labelLarge, styles.openHint]}>詳細を開く</Text>
               </View>
             </M3Card>
             </Stagger>
           )}
           ListEmptyComponent={
             <M3EmptyState icon="search">
-              <Text style={[m3type.bodyLarge, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
+              <Text style={[type.bodyLarge, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
                 {kind === 'mogiten' ? '模擬店の出店情報は準備中です' : '一致する企画が見つかりません'}
               </Text>
             </M3EmptyState>
@@ -203,6 +205,7 @@ export default function SearchScreen() {
         visible={modalVisible}
         isFavorite={isFavorite}
         onToggleFavorite={toggle}
+        showMapButton
         onClose={() => {
           setModalVisible(false);
           setSelectedId(null);
@@ -214,17 +217,35 @@ export default function SearchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: m3.surface },
-  searchWrap: { paddingHorizontal: 16, paddingTop: 8 },
-  filterPanel: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 8 },
-  resultInfo: { paddingHorizontal: 16, paddingVertical: 12 },
-  listWrap: { flex: 1 },
-  list: { paddingHorizontal: 16, paddingBottom: 96, gap: 16 },
-  card: { padding: 0 },
-  cardImage: { width: '100%', height: 140, borderRadius: 20, backgroundColor: m3.surfaceContainerHighest },
-  cardBody: { padding: 16, gap: 4 },
-  openHint: { color: m3.primary },
-  cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  fab: { position: 'absolute', right: 16, bottom: 16 },
-});
+function createStyles(s: number) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: m3.surface },
+    searchWrap: { paddingHorizontal: scaled(16, s), paddingTop: scaled(8, s) },
+    filterPanel: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: scaled(8, s),
+      paddingHorizontal: scaled(16, s),
+      paddingTop: scaled(8, s),
+    },
+    resultInfo: { paddingHorizontal: scaled(16, s), paddingVertical: scaled(12, s) },
+    listWrap: { flex: 1 },
+    list: { paddingHorizontal: scaled(16, s), paddingBottom: scaled(96, s), gap: scaled(16, s) },
+    card: { padding: 0 },
+    cardImage: {
+      width: '100%',
+      height: scaled(140, s),
+      borderRadius: scaled(20, s),
+      backgroundColor: m3.surfaceContainerHighest,
+    },
+    cardBody: { padding: scaled(16, s), gap: scaled(4, s) },
+    openHint: { color: m3.primary },
+    cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: scaled(8, s) },
+    fab: { position: 'absolute', right: scaled(16, s), bottom: scaled(16, s) },
+  });
+}
+
+function useStyles() {
+  const { scale } = useM3();
+  return React.useMemo(() => createStyles(scale), [scale]);
+}

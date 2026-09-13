@@ -4,7 +4,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router';
 import { M3FAB, M3ListItem, TopAppBar, goBackOrHome, type IconName } from '../components/m3';
 import { Stagger } from '../components/anim';
-import { m3 } from '../theme';
+import { m3, scaled } from '../theme';
+import { useM3 } from '../context/responsive';
 import type { ListPosition } from '../components/m3';
 
 interface Entry {
@@ -28,6 +29,7 @@ const ENTRIES: Entry[] = [
 
 export default function MenuScreen() {
   const insets = useSafeAreaInsets();
+  const styles = useStyles();
   const go = (href: Entry['href']) => {
     router.replace(href as never);
   };
@@ -52,8 +54,15 @@ export default function MenuScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: m3.surface },
-  body: { flexGrow: 1, justifyContent: 'center', padding: 16, paddingBottom: 16 },
-  closeWrap: { alignItems: 'flex-end', paddingHorizontal: 16, paddingBottom: 16 },
-});
+function createStyles(s: number) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: m3.surface },
+    body: { flexGrow: 1, justifyContent: 'center', padding: scaled(16, s), paddingBottom: scaled(16, s) },
+    closeWrap: { alignItems: 'flex-end', paddingHorizontal: scaled(16, s), paddingBottom: scaled(16, s) },
+  });
+}
+
+function useStyles() {
+  const { scale } = useM3();
+  return React.useMemo(() => createStyles(scale), [scale]);
+}

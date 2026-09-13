@@ -6,9 +6,12 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 import { M3Button, M3Card, M3EmptyState, M3Icon, M3LoadingView, TopAppBar } from '../../components/m3';
 import { ConfirmPop, ScanBeam, ScreenFade, SuccessCheck } from '../../components/anim';
 import { FLOOR_TOKENS, parseLocationQr } from '../../data/locationQr';
-import { m3, m3type } from '../../theme';
+import { useM3 } from '../../context/responsive';
+import { m3, scaled } from '../../theme';
 
 export default function CameraScreen() {
+  const { type } = useM3();
+  const styles = useStyles();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState<string | null>(null);
   const [active, setActive] = useState(true);
@@ -52,10 +55,10 @@ export default function CameraScreen() {
         <ScreenFade>
           <View style={styles.body}>
             <M3EmptyState icon="photo-camera">
-              <Text style={[m3type.titleMedium, { color: m3.onSurface, textAlign: 'center' }]}>
+              <Text style={[type.titleMedium, { color: m3.onSurface, textAlign: 'center' }]}>
                 廊下のQRコードを読み取ってください
               </Text>
-              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
                 QR読取にはカメラの使用許可が必要です。
               </Text>
             </M3EmptyState>
@@ -71,10 +74,10 @@ export default function CameraScreen() {
               <M3Icon name="check" size={36} color={m3.onPrimaryContainer} />
             </SuccessCheck>
             <M3Card variant="elevated" style={styles.resultCard}>
-              <Text style={[m3type.titleMedium, { color: m3.onSurface }]} accessibilityLiveRegion="polite">
+              <Text style={[type.titleMedium, { color: m3.onSurface }]} accessibilityLiveRegion="polite">
                 {location ? '現在地のQRコードを読み取りました' : 'QRを読み取りました'}
               </Text>
-              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 8 }]} numberOfLines={3}>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 8 }]} numberOfLines={3}>
                 {location ? 'マップで現在地を確認できます。' : scanned}
               </Text>
             </M3Card>
@@ -115,7 +118,7 @@ export default function CameraScreen() {
                 <ScanBeam height={214} />
               </View>
             </View>
-            <Text style={[m3type.titleMedium, { color: m3.onSurface, textAlign: 'center' }]}>
+            <Text style={[type.titleMedium, { color: m3.onSurface, textAlign: 'center' }]}>
               カメラをQRコードに向けてください
             </Text>
           </View>
@@ -125,30 +128,43 @@ export default function CameraScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: m3.surface },
-  body: { flex: 1, alignItems: 'center', padding: 16, gap: 16, justifyContent: 'center' },
-  actionRow: { width: '100%' },
-  preview: {
-    width: 380,
-    maxWidth: '100%',
-    height: 507,
-    maxHeight: '70%',
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: m3.inverseSurface,
-  },
-  frame: {
-    position: 'absolute',
-    top: '30%',
-    left: '15%',
-    right: '15%',
-    height: 220,
-    borderWidth: 3,
-    borderColor: m3.inversePrimary,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  resultCard: { width: '100%' },
-  resultActions: { width: '100%', gap: 12 },
-});
+function createStyles(s: number) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: m3.surface },
+    body: {
+      flex: 1,
+      alignItems: 'center',
+      padding: scaled(16, s),
+      gap: scaled(16, s),
+      justifyContent: 'center',
+    },
+    actionRow: { width: '100%' },
+    preview: {
+      width: scaled(380, s),
+      maxWidth: '100%',
+      height: scaled(507, s),
+      maxHeight: '70%',
+      borderRadius: scaled(20, s),
+      overflow: 'hidden',
+      backgroundColor: m3.inverseSurface,
+    },
+    frame: {
+      position: 'absolute',
+      top: '30%',
+      left: '15%',
+      right: '15%',
+      height: scaled(220, s),
+      borderWidth: 3,
+      borderColor: m3.inversePrimary,
+      borderRadius: scaled(20, s),
+      overflow: 'hidden',
+    },
+    resultCard: { width: '100%' },
+    resultActions: { width: '100%', gap: scaled(12, s) },
+  });
+}
+
+function useStyles() {
+  const { scale } = useM3();
+  return React.useMemo(() => createStyles(scale), [scale]);
+}

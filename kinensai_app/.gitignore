@@ -27,6 +27,13 @@ yarn-error.log*
 .wrangler/
 .dev.vars*
 
+# Android prebuild output (expo prebuild で生成。コミットしない)
+android/
+ios/
+
+# Playwright MCP (スクショ・ログ)
+.playwright-mcp/
+
 # OS
 .DS_Store
 Thumbs.db

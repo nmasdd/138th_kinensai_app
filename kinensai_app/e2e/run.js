@@ -185,7 +185,7 @@ function countMatches(text, re) {
 
 // ---------- F. データ・文言 ----------
 {
-  ok(fs.existsSync(path.join(SRC, 'data/classCatalog.json')), 'F01 classCatalog存在');
+  ok(fs.existsSync(path.join(SRC, 'data/bundled/class-catalog.json')), 'F01 class-catalog存在');
   const tt = src('data/timetable.ts');
   ok(/loadAuditorium/.test(tt), 'F02 講堂読込あり');
   const cg = src('data/congestion.ts');

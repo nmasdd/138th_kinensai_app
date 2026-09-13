@@ -9,11 +9,12 @@ import {
   AdminSaveBar,
   useAdminNotice,
 } from '../../components/AdminSaveBar';
-import { Section, adminStyles } from '../../components/adminUi';
+import { Section, useAdminStyles } from '../../components/adminUi';
 import { AdminGate } from '../../components/AdminGuard';
 import { loadAllExhibitions, type Exhibition } from '../../data/exhibitions';
 import { loadPickIds, savePickIds } from '../../data/picks';
-import { m3, m3type } from '../../theme';
+import { m3 } from '../../theme';
+import { useM3 } from '../../context/responsive';
 
 /**
  * 管理者用・おすすめ企画 (/admin/picks)。
@@ -30,6 +31,8 @@ export default function AdminPicksScreen() {
 }
 
 function AdminPicksContent() {
+  const { type } = useM3();
+  const adminStyles = useAdminStyles();
   const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [catalog, setCatalog] = useState<Exhibition[]>([]);
@@ -110,11 +113,11 @@ function AdminPicksContent() {
             <M3SearchBar value={query} onChangeText={setQuery} placeholder="企画を検索" />
           </View>
           <Section title="おすすめ企画 (ホーム表示・複数選択)">
-            <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, marginBottom: 8 }]}>
+            <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginBottom: 8 }]}>
               ホームの「おすすめ企画」に表示する企画を選びます。タップした順に表示されます。未設定のときはカタログ先頭2件を表示します。
             </Text>
             {pickIds.length === 0 ? (
-              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant, marginBottom: 8 }]}>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginBottom: 8 }]}>
                 未選択です (フォールバック: カタログ先頭2件を表示中)
               </Text>
             ) : (
@@ -124,21 +127,21 @@ function AdminPicksContent() {
                 return (
                   <View key={`pick-${id}`} style={adminStyles.row}>
                     <View style={adminStyles.rowText}>
-                      <Text style={[m3type.titleSmall, { color: m3.onSurface }]} numberOfLines={1}>
+                      <Text style={[type.titleSmall, { color: m3.onSurface }]} numberOfLines={1}>
                         {i + 1}. {ex.className} {ex.projectName || '(タイトル未定)'}
                       </Text>
-                      <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={1}>
+                      <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={1}>
                         {ex.kind === 'class' ? 'クラス企画' : '教室有志企画'}
                       </Text>
                     </View>
                     <M3Touch label={`${ex.className}を1つ上へ`} round onPress={() => movePick(id, -1)}>
-                      <Text style={[m3type.labelLarge, adminStyles.link]}>上へ</Text>
+                      <Text style={[type.labelLarge, adminStyles.link]}>上へ</Text>
                     </M3Touch>
                     <M3Touch label={`${ex.className}を1つ下へ`} round onPress={() => movePick(id, 1)}>
-                      <Text style={[m3type.labelLarge, adminStyles.link]}>下へ</Text>
+                      <Text style={[type.labelLarge, adminStyles.link]}>下へ</Text>
                     </M3Touch>
                     <M3Touch label={`${ex.className}を選択から外す`} round onPress={() => togglePick(id)}>
-                      <Text style={[m3type.labelLarge, adminStyles.danger]}>外す</Text>
+                      <Text style={[type.labelLarge, adminStyles.danger]}>外す</Text>
                     </M3Touch>
                   </View>
                 );
@@ -156,14 +159,14 @@ function AdminPicksContent() {
                 >
                   <View style={[adminStyles.row, selected && adminStyles.rowActive]}>
                     <View style={adminStyles.rowText}>
-                      <Text style={[m3type.titleSmall, { color: m3.onSurface }]} numberOfLines={1}>
+                      <Text style={[type.titleSmall, { color: m3.onSurface }]} numberOfLines={1}>
                         {ex.className} {ex.projectName || '(タイトル未定)'}
                       </Text>
-                      <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={1}>
+                      <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={1}>
                         {ex.kind === 'class' ? 'クラス企画' : '教室有志企画'}
                       </Text>
                     </View>
-                    <Text style={[m3type.labelLarge, { color: selected ? m3.primary : m3.onSurfaceVariant }]}>
+                    <Text style={[type.labelLarge, { color: selected ? m3.primary : m3.onSurfaceVariant }]}>
                       {selected ? `${order + 1}番目に選択中` : '選択'}
                     </Text>
                   </View>
@@ -171,7 +174,7 @@ function AdminPicksContent() {
               );
             })}
             {visibleCatalog.length === 0 ? (
-              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>一致する企画はありません</Text>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>一致する企画はありません</Text>
             ) : null}
             <View style={adminStyles.buttonRow}>
               <M3Button label="選択をクリア" variant="tonal" onPress={() => setPickIds([])} />

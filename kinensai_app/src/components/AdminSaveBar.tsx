@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { M3Button, type IconName } from './m3';
-import { m3, m3type } from '../theme';
+import { useM3 } from '../context/responsive';
+import { m3, scaled, type M3Shape } from '../theme';
 
 /**
  * 管理者サブページ共通の保存バー・ポップアップ。
@@ -57,11 +58,13 @@ export function useAdminNotice(timeoutMs = 3000) {
 
 /** 画面上部に重ねて表示する保存結果ポップアップ。3秒で自動的に消える。 */
 export function AdminNotice({ notice }: { notice: AdminNoticeData | null }) {
+  const { type } = useM3();
+  const styles = useStyles();
   if (!notice) return null;
   return (
     <View style={styles.noticeWrap} pointerEvents="none">
       <View style={[styles.notice, notice.ok ? styles.noticeOk : styles.noticeErr]}>
-        <Text style={[m3type.bodyMedium, { color: notice.ok ? m3.onPrimaryContainer : m3.onErrorContainer }]}>
+        <Text style={[type.bodyMedium, { color: notice.ok ? m3.onPrimaryContainer : m3.onErrorContainer }]}>
           {notice.message}
         </Text>
       </View>
@@ -79,6 +82,7 @@ export function AdminSaveBar({
   showOk: (message: string) => void;
   showErr: (message: string) => void;
 }) {
+  const styles = useStyles();
   const [busy, setBusy] = useState<number | null>(null);
 
   const press = async (index: number) => {
@@ -110,38 +114,45 @@ export function AdminSaveBar({
   );
 }
 
-const styles = StyleSheet.create({
-  noticeWrap: {
-    position: 'absolute',
-    top: 8,
-    left: 16,
-    right: 16,
-  },
-  notice: {
-    borderRadius: 20,
-    padding: 12,
-  },
-  noticeOk: {
-    backgroundColor: m3.primaryContainer,
-  },
-  noticeErr: {
-    backgroundColor: m3.errorContainer,
-  },
-  bar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    padding: 12,
-    backgroundColor: m3.surface,
-    borderTopWidth: 1,
-    borderTopColor: m3.outlineVariant,
-  },
-  actionWrap: {
-    flex: 1,
-    minWidth: 200,
-  },
-});
+function createStyles(s: number, shape: M3Shape) {
+  return StyleSheet.create({
+    noticeWrap: {
+      position: 'absolute',
+      top: scaled(8, s),
+      left: scaled(16, s),
+      right: scaled(16, s),
+    },
+    notice: {
+      borderRadius: shape.card,
+      padding: scaled(12, s),
+    },
+    noticeOk: {
+      backgroundColor: m3.primaryContainer,
+    },
+    noticeErr: {
+      backgroundColor: m3.errorContainer,
+    },
+    bar: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: scaled(8, s),
+      padding: scaled(12, s),
+      backgroundColor: m3.surface,
+      borderTopWidth: 1,
+      borderTopColor: m3.outlineVariant,
+    },
+    actionWrap: {
+      flex: 1,
+      minWidth: scaled(200, s),
+    },
+  });
+}
+
+function useStyles() {
+  const { scale, shape } = useM3();
+  return React.useMemo(() => createStyles(scale, shape), [scale, shape]);
+}

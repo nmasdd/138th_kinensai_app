@@ -10,13 +10,14 @@ import {
   adminErrorMessage,
   useAdminNotice,
 } from '../../components/AdminSaveBar';
-import { Chips, Field, ImageField, Section, adminStyles, type TicketState } from '../../components/adminUi';
+import { Chips, Field, ImageField, Section, useAdminStyles, type TicketState } from '../../components/adminUi';
 import { AdminGate } from '../../components/AdminGuard';
 import { loadVolunteers, saveVolunteers } from '../../data/volunteers';
 import { loadTicketMap, saveTicketMap, type TicketInfo } from '../../data/tickets';
 import { deleteStoredImage } from '../../data/images';
 import type { Exhibition } from '../../data/exhibitions';
-import { m3, m3type } from '../../theme';
+import { m3 } from '../../theme';
+import { useM3 } from '../../context/responsive';
 
 /**
  * 管理者用・有志企画 (/admin/volunteer)。
@@ -55,6 +56,8 @@ export default function AdminVolunteerScreen() {
 }
 
 function AdminVolunteerContent() {
+  const { type } = useM3();
+  const adminStyles = useAdminStyles();
   const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [volunteers, setVolunteers] = useState<Exhibition[]>([]);
@@ -153,10 +156,10 @@ function AdminVolunteerContent() {
             {visibleVolunteers.map((v) => (
               <View key={v.id} style={adminStyles.row}>
                 <View style={adminStyles.rowText}>
-                  <Text style={[m3type.titleSmall, { color: m3.onSurface }]} numberOfLines={1}>
+                  <Text style={[type.titleSmall, { color: m3.onSurface }]} numberOfLines={1}>
                     {v.className} {v.projectName}
                   </Text>
-                  <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={1}>
+                  <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]} numberOfLines={1}>
                     {v.description}
                   </Text>
                 </View>
@@ -176,7 +179,7 @@ function AdminVolunteerContent() {
                     })
                   }
                 >
-                  <Text style={[m3type.labelLarge, adminStyles.link]}>編集</Text>
+                  <Text style={[type.labelLarge, adminStyles.link]}>編集</Text>
                 </M3Touch>
                 <M3Touch
                   label="削除"
@@ -185,15 +188,15 @@ function AdminVolunteerContent() {
                     deleteVolunteer(v.id).then(showOk).catch((e) => showErr(adminErrorMessage(e)));
                   }}
                 >
-                  <Text style={[m3type.labelLarge, adminStyles.danger]}>削除</Text>
+                  <Text style={[type.labelLarge, adminStyles.danger]}>削除</Text>
                 </M3Touch>
               </View>
             ))}
             {visibleVolunteers.length === 0 ? (
-              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>一致する企画はありません</Text>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>一致する企画はありません</Text>
             ) : null}
             <View style={adminStyles.block}>
-              <Text style={[m3type.titleSmall, { color: m3.onSurface }]}>
+              <Text style={[type.titleSmall, { color: m3.onSurface }]}>
                 {volDraft.id ? '編集中' : '新規追加'}
               </Text>
               <Field label="団体名">

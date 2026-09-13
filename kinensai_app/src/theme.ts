@@ -1,3 +1,5 @@
+import type { TextStyle } from 'react-native';
+
 /**
  * Material 3 Expressive カスタムライトカラースキーム (固定ライトモード)。
  * UI の色は必ずこのロール経由で参照し、ハードコードした色は使わない。
@@ -91,3 +93,76 @@ export const theme = {
   border: m3.outlineVariant,
   danger: m3.error,
 } as const;
+
+// ─────────────────────────────────────────────────────────────────────────
+// レスポンシブ・スケーリング
+// 設計上の想定画面幅 BASE_WIDTH を基準に、実際の画面幅から倍率を求め、
+// 文字サイズ (m3type)・余白 (m3layout)・形状 (m3shape) を一律に拡縮する。
+// 縮小・拡大とも上限なし。
+// ─────────────────────────────────────────────────────────────────────────
+
+/** レスポンシブの基準幅 (設計上の想定画面幅)。 */
+export const BASE_WIDTH = 390;
+
+export type M3Type = {
+  [K in keyof typeof m3type]: {
+    fontSize: number;
+    fontWeight: TextStyle['fontWeight'];
+    lineHeight: number;
+  };
+};
+export type M3Layout = {
+  touchMin: number;
+  screenPadding: number;
+  sectionGap: number;
+  cardGap: number;
+};
+export type M3Shape = {
+  pill: number;
+  card: number;
+  dialog: number;
+  fab: number;
+  fabLarge: number;
+  fabSmall: number;
+};
+
+/** 任意の数値を倍率適用 (丸め)。 */
+export function scaled(value: number, scale: number): number {
+  return Math.round(value * scale);
+}
+
+/** m3type を倍率適用したコピーを返す。 */
+export function scaleM3Type(scale: number): M3Type {
+  const out = {} as Record<keyof M3Type, { fontSize: number; fontWeight: TextStyle['fontWeight']; lineHeight: number }>;
+  (Object.keys(m3type) as (keyof M3Type)[]).forEach((key) => {
+    const v = m3type[key];
+    out[key] = {
+      fontSize: Math.max(1, Math.round(v.fontSize * scale)),
+      lineHeight: Math.max(1, Math.round(v.lineHeight * scale)),
+      fontWeight: v.fontWeight,
+    };
+  });
+  return out as M3Type;
+}
+
+/** m3layout を倍率適用したコピーを返す。 */
+export function scaleM3Layout(scale: number): M3Layout {
+  return {
+    touchMin: Math.max(1, Math.round(m3layout.touchMin * scale)),
+    screenPadding: Math.max(1, Math.round(m3layout.screenPadding * scale)),
+    sectionGap: Math.max(1, Math.round(m3layout.sectionGap * scale)),
+    cardGap: Math.max(1, Math.round(m3layout.cardGap * scale)),
+  };
+}
+
+/** m3shape を倍率適用したコピーを返す (ピルは据え置き)。 */
+export function scaleM3Shape(scale: number): M3Shape {
+  return {
+    pill: m3shape.pill,
+    card: Math.max(1, Math.round(m3shape.card * scale)),
+    dialog: Math.max(1, Math.round(m3shape.dialog * scale)),
+    fab: Math.max(1, Math.round(m3shape.fab * scale)),
+    fabLarge: Math.max(1, Math.round(m3shape.fabLarge * scale)),
+    fabSmall: Math.max(1, Math.round(m3shape.fabSmall * scale)),
+  };
+}

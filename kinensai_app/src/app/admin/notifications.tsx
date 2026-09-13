@@ -10,11 +10,12 @@ import {
   adminErrorMessage,
   useAdminNotice,
 } from '../../components/AdminSaveBar';
-import { Field, ImageField, Section, adminStyles, today } from '../../components/adminUi';
+import { Field, ImageField, Section, useAdminStyles, today } from '../../components/adminUi';
 import { AdminGate } from '../../components/AdminGuard';
 import { loadNotifications, saveNotifications, type AppNotification } from '../../data/notifications';
 import { deleteStoredImage } from '../../data/images';
-import { m3, m3type } from '../../theme';
+import { m3 } from '../../theme';
+import { useM3 } from '../../context/responsive';
 
 /**
  * 管理者用・通知 (/admin/notifications)。
@@ -31,6 +32,8 @@ export default function AdminNotificationsScreen() {
 }
 
 function AdminNotificationsContent() {
+  const { type } = useM3();
+  const adminStyles = useAdminStyles();
   const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -114,8 +117,8 @@ function AdminNotificationsContent() {
             {visibleNotifications.map((n) => (
               <View key={n.id} style={adminStyles.row}>
                 <View style={adminStyles.rowText}>
-                  <Text style={[m3type.labelMedium, { color: m3.onSurfaceVariant }]}>{n.date}</Text>
-                  <Text style={[m3type.titleSmall, { color: m3.onSurface }]} numberOfLines={1}>
+                  <Text style={[type.labelMedium, { color: m3.onSurfaceVariant }]}>{n.date}</Text>
+                  <Text style={[type.titleSmall, { color: m3.onSurface }]} numberOfLines={1}>
                     {n.title}
                   </Text>
                 </View>
@@ -126,12 +129,12 @@ function AdminNotificationsContent() {
                     deleteNotification(n.id).then(showOk).catch((e) => showErr(adminErrorMessage(e)));
                   }}
                 >
-                  <Text style={[m3type.labelLarge, adminStyles.danger]}>削除</Text>
+                  <Text style={[type.labelLarge, adminStyles.danger]}>削除</Text>
                 </M3Touch>
               </View>
             ))}
             {visibleNotifications.length === 0 ? (
-              <Text style={[m3type.bodyMedium, { color: m3.onSurfaceVariant }]}>一致する通知はありません</Text>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>一致する通知はありません</Text>
             ) : null}
             <View style={adminStyles.block}>
               <Field label="タイトル">
