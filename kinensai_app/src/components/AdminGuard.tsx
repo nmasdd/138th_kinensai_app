@@ -139,23 +139,14 @@ async function postAdminApi(path: string, payload: unknown): Promise<unknown | n
 }
 
 /**
- * 【開発補助】管理者ページのパスワード認証をスキップする。
- * - 本番ビルド (`__DEV__ === false`) では常に認証必須。
- * - 開発時も既定では認証必須。ローカルで認証APIを用意せず確認したい場合だけ
- *   `EXPO_PUBLIC_ADMIN_BYPASS=1` を付けて起動する
- *   (例: `EXPO_PUBLIC_ADMIN_BYPASS=1 npm run web`)。
- * - 誤って本番で無効化されることがないよう、フラグは環境変数のみで判定する。
+ * 【一時設定】管理者ページのパスワード認証をスキップする。
+ * - 本番ビルド (`__DEV__ === false`) では常に認証必須 (この値は dev でのみ有効)。
+ * - 現在は一時的に true (認証不要)。動作確認が済んだら false に戻すこと。
+ *   false に戻すと通常のサーバ認証 (POST /api/admin/login) に戻る。
+ *   (既定に戻す場合は下の環境変数判定を使う:
+ *    `EXPO_PUBLIC_ADMIN_BYPASS=1` を付けたときだけスキップ)
  */
-const ADMIN_BYPASS_PASSWORD =
-  (() => {
-    if (!__DEV__) return false;
-    try {
-      const v = (process.env?.EXPO_PUBLIC_ADMIN_BYPASS ?? '').trim();
-      return v === '1' || v === 'true';
-    } catch {
-      return false;
-    }
-  })();
+const ADMIN_BYPASS_PASSWORD = __DEV__;
 
 /** 全 /admin/* ページをラップし、未認証ならパスワード入力を先に表示する。 */
 export function AdminGate({ children }: { children: React.ReactNode }) {

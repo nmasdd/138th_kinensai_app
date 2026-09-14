@@ -196,7 +196,7 @@ function AdminClassContent() {
     <SafeAreaView style={adminStyles.container} edges={['top']}>
       <TopAppBar title="管理者用・クラス企画" />
       <View style={adminStyles.contentWrap}>
-        <ScrollView contentContainerStyle={[adminStyles.body, { paddingBottom: ADMIN_FOOTER_SPACE }]}>
+        <ScrollView style={adminStyles.scroll} contentContainerStyle={[adminStyles.body, { paddingBottom: ADMIN_FOOTER_SPACE }]}>
           <View style={adminStyles.searchWrap}>
             <M3SearchBar value={query} onChangeText={setQuery} placeholder="クラス企画を検索" />
           </View>
@@ -335,7 +335,7 @@ function AdminClassContent() {
             </View>
           </Section>
           <View style={adminStyles.backWrap}>
-            <M3Button label="目次に戻る" icon="undo" variant="tonal" onPress={() => router.push('/admin/index' as never)} />
+            <M3Button label="目次に戻る" icon="undo" variant="tonal" onPress={() => router.push('/admin' as never)} />
           </View>
         </ScrollView>
         <AdminNotice notice={notice} />

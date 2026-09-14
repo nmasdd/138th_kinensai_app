@@ -62,7 +62,6 @@ function M3NavBar({ state, navigation }: NavBarProps) {
                     style={{
                       width: scaled(46, scale),
                       height: scaled(46, scale),
-                      opacity: focused ? 1 : 0.55,
                     }}
                     resizeMode="contain"
                   />

@@ -214,7 +214,7 @@ function AdminMapContent() {
     <SafeAreaView style={adminStyles.container} edges={['top']}>
       <TopAppBar title="管理者用・マップ配置" />
       <View style={adminStyles.contentWrap}>
-        <ScrollView contentContainerStyle={[adminStyles.body, { paddingBottom: MAP_FOOTER_SPACE }]}>
+        <ScrollView style={adminStyles.scroll} contentContainerStyle={[adminStyles.body, { paddingBottom: MAP_FOOTER_SPACE }]}>
           <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
             フロア地図で部屋をタップして選び、下の一覧または地図タップで位置を調整します。
             地図の何もない場所をタップすると、選択中の部屋がその位置へ移動します。
@@ -314,7 +314,7 @@ function AdminMapContent() {
               label="目次に戻る"
               icon="undo"
               variant="tonal"
-              onPress={() => router.push('/admin/index' as never)}
+              onPress={() => router.push('/admin' as never)}
             />
           </View>
         </ScrollView>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { M3Button, M3Card, M3Touch } from './m3';
 import { deleteStoredImage, pickImageUri } from '../data/images';
 import { m3, scaled } from '../theme';
@@ -104,11 +104,29 @@ export function ImageField({
   );
 }
 
+/** Web で container に与える高さの上限。RN の型にない単位のためキャストする。 */
+const WEB_VIEWPORT_HEIGHT = '100dvh' as unknown as undefined;
+
 function createStyles(s: number) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: m3.surface },
+    container: {
+      flex: 1,
+      minHeight: 0,
+      overflow: 'hidden',
+      backgroundColor: m3.surface,
+      // Web の js-stack は画面を minHeight:100% (flexなし) のラッパーに入れるため、
+      // 親の高さが不定になり、配下の flex:1 の ScrollView が内容高まで伸びて
+      // スクロールできなくなる。ビューポート基準の上限で高さを確定させて
+      // 配下を制約する (flexアイテムは flex-basis が height に優先するため
+      // height 指定では効かず、maxHeight での上限制約が必要。ネイティブの
+      // スタックは高さが確定するので Web のみ)。
+      ...(Platform.OS === 'web' ? { maxHeight: WEB_VIEWPORT_HEIGHT } : null),
+    },
     center: { flex: 1, backgroundColor: m3.surface, justifyContent: 'center', alignItems: 'center' },
-    contentWrap: { flex: 1 },
+    // Web で flex 子が内容高さまで伸びてスクロールできなくなるのを防ぐ
+    // (minHeight: 0 + overflow: hidden で親の高さに制約し、ScrollView を flex:1 にする)。
+    contentWrap: { flex: 1, minHeight: 0, overflow: 'hidden' },
+    scroll: { flex: 1, minHeight: 0 },
     body: { padding: scaled(16, s), gap: scaled(12, s) },
     searchWrap: { marginBottom: scaled(4, s) },
     section: { gap: 0 },

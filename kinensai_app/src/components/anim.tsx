@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -49,6 +50,21 @@ type EnterOptions = {
 function useEnter({ delay = 0, translateY = 0, scaleFrom = 1, spring = false, pop = false }: EnterOptions) {
   const reduced = useReducedMotion();
   const progress = useSharedValue(0);
+  // 再フォーカスで再生し直すためのトリガー (初回マウント時の再生と区別する)
+  const [replay, setReplay] = useState(0);
+  const focusedOnceRef = useRef(false);
+
+  // タブ・スタック画面は一度マウントされると残るため、再フォーカスするたびに
+  // アニメーションを再生し直す (初回はマウント時の effect が担当する)。
+  useFocusEffect(
+    useCallback(() => {
+      if (!focusedOnceRef.current) {
+        focusedOnceRef.current = true;
+        return;
+      }
+      setReplay((n) => n + 1);
+    }, []),
+  );
 
   useEffect(() => {
     if (reduced) {
@@ -58,8 +74,9 @@ function useEnter({ delay = 0, translateY = 0, scaleFrom = 1, spring = false, po
     const target = spring || pop
       ? withSpring(1, pop ? springPop : springIn)
       : withTiming(1, { duration: ENTER_MS, easing: Easing.out(Easing.cubic) });
+    progress.value = 0;
     progress.value = delay > 0 ? withDelay(delay, target) : target;
-  }, [delay, pop, progress, reduced, spring]);
+  }, [delay, pop, progress, reduced, replay, spring]);
 
   return useAnimatedStyle(() => {
     const p = progress.value;

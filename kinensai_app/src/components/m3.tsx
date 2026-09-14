@@ -14,7 +14,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -87,13 +87,15 @@ export function M3Icon({ name, size = 24, color = m3.onSurface }: { name: IconNa
 export function TopAppBar({ title }: { title: string }) {
   const styles = useStyles();
   const { type } = useM3();
+  // メニュー画面では同じボタンが「閉じる」として働く (トグル)
+  const onMenu = usePathname() === '/menu';
   return (
     <View style={styles.appBar} accessibilityRole="header">
       <Pressable
-        accessibilityLabel="メニューを開く"
+        accessibilityLabel={onMenu ? 'メニューを閉じる' : 'メニューを開く'}
         accessibilityRole="button"
         android_ripple={{ color: 'rgba(0,0,0,0.12)', borderless: true }}
-        onPress={() => router.push('/menu')}
+        onPress={() => (onMenu ? goBackOrHome() : router.push('/menu'))}
         style={styles.appBarIcon}
       >
         <M3Icon name="menu" />

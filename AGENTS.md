@@ -9,6 +9,7 @@
   npm run lint   # expo lint
   ```
   test runner・typecheck scriptなし。検証は `node_modules\.bin\eslint src\ --quiet` と `node_modules\.bin\tsc --noEmit` で代用。
+- プログラム変更後は必ず Playwright MCP でアプリを実際に操作してテストする (`localhost:8081` の `expo start --web` に接続し、`playwright_browser_navigate` / `playwright_browser_snapshot` / `playwright_browser_click` 等で遷移・操作を確認、`playwright_browser_console_messages` でコンソールエラー0を確認)。
 
 ## 仕様の正本 (必読・優先順)
 1. `仕様書.md` — タブ構成・各画面要件の正本。ここにない無関係機能は実装しない。既存なら削除する。

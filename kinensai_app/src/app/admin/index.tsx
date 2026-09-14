@@ -53,7 +53,8 @@ function AdminIndexContent() {
   return (
     <SafeAreaView style={adminStyles.container} edges={['top']}>
       <TopAppBar title="管理者用" />
-      <ScrollView contentContainerStyle={adminStyles.body}>
+      <View style={adminStyles.contentWrap}>
+        <ScrollView style={adminStyles.scroll} contentContainerStyle={adminStyles.body}>
         <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
           /admin の直接アクセス専用ページです。各画面の保存はこの端末のプレビューとして即反映されます。全世界へ反映するには「データ管理」の公開手順を使ってください。
         </Text>
@@ -77,7 +78,8 @@ function AdminIndexContent() {
         <View style={adminStyles.backWrap}>
           <M3Button label="戻る" icon="undo" onPress={() => goBackOrHome()} />
         </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }

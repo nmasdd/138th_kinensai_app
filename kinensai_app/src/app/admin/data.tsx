@@ -342,7 +342,7 @@ function AdminDataContent() {
     <SafeAreaView style={adminStyles.container} edges={['top']}>
       <TopAppBar title="管理者用・データ管理" />
       <View style={adminStyles.contentWrap}>
-        <ScrollView contentContainerStyle={[adminStyles.body, { paddingBottom: DATA_FOOTER_SPACE }]}>
+        <ScrollView style={adminStyles.scroll} contentContainerStyle={[adminStyles.body, { paddingBottom: DATA_FOOTER_SPACE }]}>
           <Section title="データの書き出し・取り込み">
             <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginBottom: 8 }]}>
               端末間の移行・バックアップ用です。「書き出し」でJSONを表示し、「取り込み」で貼り付けたJSONを保存します。
@@ -418,7 +418,7 @@ function AdminDataContent() {
             />
           </Section>
           <View style={adminStyles.backWrap}>
-            <M3Button label="目次に戻る" icon="undo" variant="tonal" onPress={() => router.push('/admin/index' as never)} />
+            <M3Button label="目次に戻る" icon="undo" variant="tonal" onPress={() => router.push('/admin' as never)} />
           </View>
         </ScrollView>
         <AdminNotice notice={notice} />

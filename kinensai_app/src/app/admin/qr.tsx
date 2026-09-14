@@ -58,7 +58,8 @@ function AdminQrContent() {
   return (
     <SafeAreaView style={adminStyles.container} edges={['top']}>
       <TopAppBar title="管理者用・QRコード作成" />
-      <ScrollView contentContainerStyle={adminStyles.body}>
+      <View style={adminStyles.contentWrap}>
+        <ScrollView style={adminStyles.scroll} contentContainerStyle={adminStyles.body}>
         <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
           廊下などに貼る現在地QRコードを作成します。地図をタップして場所を指定してください。
           読み取ると、その階の指定座標に現在地（青いドット）が表示されます。
@@ -105,10 +106,11 @@ function AdminQrContent() {
             label="目次に戻る"
             icon="undo"
             variant="tonal"
-            onPress={() => router.push('/admin/index' as never)}
+            onPress={() => router.push('/admin' as never)}
           />
         </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }

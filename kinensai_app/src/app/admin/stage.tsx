@@ -329,7 +329,7 @@ function AdminStageContent() {
     <SafeAreaView style={adminStyles.container} edges={['top']}>
       <TopAppBar title="管理者用・ステージ/講堂" />
       <View style={adminStyles.contentWrap}>
-        <ScrollView contentContainerStyle={[adminStyles.body, { paddingBottom: STAGE_FOOTER_SPACE }]}>
+        <ScrollView style={adminStyles.scroll} contentContainerStyle={[adminStyles.body, { paddingBottom: STAGE_FOOTER_SPACE }]}>
           <View style={adminStyles.searchWrap}>
             <M3SearchBar value={query} onChangeText={setQuery} placeholder="団体・演目を検索" />
           </View>
@@ -770,7 +770,7 @@ function AdminStageContent() {
           </Section>
 
           <View style={adminStyles.backWrap}>
-            <M3Button label="目次に戻る" icon="undo" variant="tonal" onPress={() => router.push('/admin/index' as never)} />
+            <M3Button label="目次に戻る" icon="undo" variant="tonal" onPress={() => router.push('/admin' as never)} />
           </View>
         </ScrollView>
         <AdminNotice notice={notice} />

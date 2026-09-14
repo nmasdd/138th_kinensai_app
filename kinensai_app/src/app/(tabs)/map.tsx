@@ -217,9 +217,6 @@ export default function MapScreen() {
             onSelect={selectHotspot}
           />
         </ScreenFade>
-        <Text style={[type.bodyMedium, styles.hint]} accessibilityLiveRegion="polite">
-          ドラッグで移動・ピンチ/ホイール/＋−で拡大縮小・部屋タップで詳細表示
-        </Text>
         {locText && (
           <Rise>
             <View style={styles.locBanner} accessibilityLiveRegion="polite">
@@ -310,7 +307,6 @@ function createStyles(s: number, shape: M3Shape) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: m3.surface },
     body: { padding: scaled(16, s), gap: scaled(12, s), paddingBottom: scaled(16, s) },
-    hint: { color: m3.onSurfaceVariant, textAlign: 'center' },
     coLocatedLink: { color: m3.primary, marginTop: scaled(8, s) },
     locBanner: { backgroundColor: m3.primaryContainer, borderRadius: shape.card, padding: scaled(12, s) },
     selfBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scaled(6, s) },
