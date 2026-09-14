@@ -40,7 +40,7 @@
 - `app.json` の `experiments.typedRoutes, reactCompiler` 有効。`@/*→src/*` エイリアス (`tsconfig.json`)。`expo-env.d.ts` は生成物。
 - 画面雛形は `SafeAreaView `#ffffff` + `Header`。色は現状 `#208AEF` (青) が残っている箇所あり — 新規UIは青を使わずオレンジ系に寄せる。
 - UI は **Material 3**、モーションは **Apple HIG** に準拠 (`デザインルール.md`・`仕様書.md` §14)。アニメーションは `src/components/anim.tsx` に集約し、React Native Reanimated + `useReducedMotion()` で Reduce Motion を必ず尊重する。
-- `opencode.json` は **git 管理外** (`.gitignore` に登録済み)。ローカルのエージェント／MCP 設定のため個人環境依存であり、ステージ・コミットしない (`git add` しても入らない)。
+- `opencode.json` は **git 管理下** (`.gitignore` に登録しない)。エージェント／MCP 設定 (Playwright MCP) の共有設定であり、削除すると更新時に消えるためステージ・コミットする。
 
 ## Cloudflare 公開 (https://app.kinensai.jp/)
 - Worker名 `kinensai-app` (zone `kinensai.jp`、カスタムドメイン `app.kinensai.jp`)。`138th-kinensai` (本体サイト) には触らない。

@@ -12,4 +12,3 @@ kinensai_app/dist/
 .expo/
 *.log
 .playwright-mcp/
-opencode.json
