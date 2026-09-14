@@ -11,7 +11,7 @@
   },
   {
     "id": "club-02",
-    "className": "美術部",
+    "className": "中高美術部",
     "projectName": "実演発表",
     "description": "美術部は部員全員で半年かけ制作した巨大ピタゴラ装置を実演します。圧巻のからくりをご覧下さい。",
     "ticketRequired": "unknown",
@@ -23,7 +23,7 @@
     "id": "club-03",
     "className": "模型研究同好会",
     "projectName": "展示",
-    "description": "主に家庭科室で活動している同好会です。プラモデル制作をしています。",
+    "description": "プラモデルの展示を行います。見に来てください！",
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
@@ -43,7 +43,7 @@
     "id": "club-05",
     "className": "弁論部",
     "projectName": "実演発表",
-    "description": "部員による弁論を行います。ぜひお越し下さい",
+    "description": "26日13時30分から、部員による弁論を行います。ぜひお越し下さい。",
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
@@ -97,7 +97,8 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
-    "place": "英語コミュニケーションルーム"
+    "place": "英語コミュニケーションルーム",
+    "mogiten": false
   },
   {
     "id": "club-11",
@@ -141,8 +142,8 @@
   },
   {
     "id": "club-15",
-    "className": "写真展示",
-    "projectName": "展示, 販売",
+    "className": "永井抱陽写真館",
+    "projectName": "写真展示",
     "description": "同行して撮影した中学校夏行事の写真を展示、販売いたします。",
     "ticketRequired": "unknown",
     "ticketTime": null,
@@ -243,11 +244,11 @@
     "id": "club-25",
     "className": "写真部",
     "projectName": "展示",
-    "description": "部員が撮った写真を展示しています。ご気軽にお越し下さい。",
+    "description": "部員が撮った写真を展示しています。お気軽にお越し下さい。",
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
-    "place": "包装室前"
+    "place": "放送室前"
   },
   {
     "id": "club-26",
@@ -291,13 +292,14 @@
   },
   {
     "id": "club-30",
-    "className": "ポン菓子",
-    "projectName": "販売・配布",
-    "description": "去年と同じ",
+    "className": "高校PTA",
+    "projectName": "ポン菓子",
+    "description": "恒例の「ポン菓子」の配布を行います。模擬店付近で実施していますのでぜひお越しください。27日10:00～",
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
-    "place": "本館下ピロティ"
+    "place": "本館下ピロティ",
+    "mogiten": false
   },
   {
     "id": "club-31",
@@ -321,7 +323,7 @@
   },
   {
     "id": "club-33",
-    "className": "美術科",
+    "className": "中学美術科",
     "projectName": "作品展示",
     "description": "今年も中学校舎３階美術室にて、中学２年生美術課題、模写及び粘土によるお面制作品を展示いたします。",
     "ticketRequired": "unknown",
@@ -377,7 +379,7 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
-    "place": "本館西側ピロティ"
+    "place": "本館西ピロティ"
   },
   {
     "id": "club-39",
@@ -447,6 +449,16 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
-    "place": null
+    "place": "大回廊"
+  },
+  {
+    "id": "club-46",
+    "className": "作品展",
+    "projectName": "展示",
+    "description": "夏休みの課題の展示などを行っています。生徒たちの力作をぜひご覧ください。",
+    "ticketRequired": "unknown",
+    "ticketTime": null,
+    "kind": "volunteer",
+    "place": "中学一年教室"
   }
 ]

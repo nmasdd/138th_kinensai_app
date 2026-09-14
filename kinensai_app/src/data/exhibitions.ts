@@ -15,6 +15,8 @@ export interface Exhibition {
   /** クラス企画 / 教室有志企画の種別 */
   kind: 'class' | 'volunteer';
   place: string | null;
+  /** 模擬店として検索の「模擬店」絞り込みに出すか (未指定は従来の正規表現判定) */
+  mogiten?: boolean;
   /** 管理者ページで登録した画像 (file:// URI または dataURL)。なければ null */
   imageUri?: string | null;
 }
@@ -102,6 +104,7 @@ export async function loadExhibitions(): Promise<Exhibition[]> {
       kind: 'class' as const,
       place: ov?.place ?? c.place ?? null,
       imageUri: ov?.imageUri ?? null,
+      mogiten: c.mogiten === true,
     };
   });
   const customs: Exhibition[] = custom.map((e) => {

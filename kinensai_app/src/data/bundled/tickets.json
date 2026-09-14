@@ -1,0 +1,284 @@
+{
+  "1A": {
+    "required": "none"
+  },
+  "1B": {
+    "required": "required"
+  },
+  "1C": {
+    "required": "none"
+  },
+  "1D": {
+    "required": "required"
+  },
+  "1E": {
+    "required": "none"
+  },
+  "1F": {
+    "required": "required"
+  },
+  "1G": {
+    "required": "required"
+  },
+  "1H": {
+    "required": "required"
+  },
+  "1I": {
+    "required": "none"
+  },
+  "1J": {
+    "required": "required"
+  },
+  "2A": {
+    "required": "required"
+  },
+  "2B": {
+    "required": "none"
+  },
+  "2C": {
+    "required": "none"
+  },
+  "2D": {
+    "required": "none"
+  },
+  "2E": {
+    "required": "none"
+  },
+  "2F": {
+    "required": "none"
+  },
+  "2G": {
+    "required": "required"
+  },
+  "2H": {
+    "required": "required"
+  },
+  "2I": {
+    "required": "none"
+  },
+  "2J": {
+    "required": "required"
+  },
+  "3A": {
+    "required": "none"
+  },
+  "3B": {
+    "required": "none"
+  },
+  "3C": {
+    "required": "none"
+  },
+  "3D": {
+    "required": "none"
+  },
+  "3E": {
+    "required": "none"
+  },
+  "3F": {
+    "required": "none"
+  },
+  "3G": {
+    "required": "none"
+  },
+  "3H": {
+    "required": "none"
+  },
+  "3I": {
+    "required": "none"
+  },
+  "3J": {
+    "required": "none"
+  },
+  "J3A": {
+    "required": "none"
+  },
+  "J3B": {
+    "required": "none"
+  },
+  "J3C": {
+    "required": "none"
+  },
+  "J3D": {
+    "required": "none"
+  },
+  "J3E": {
+    "required": "none"
+  },
+  "J3F": {
+    "required": "none"
+  },
+  "J3G": {
+    "required": "none"
+  },
+  "J3H": {
+    "required": "none"
+  },
+  "J3I": {
+    "required": "none"
+  },
+  "J2A": {
+    "required": "none"
+  },
+  "J2B": {
+    "required": "none"
+  },
+  "J2C": {
+    "required": "none"
+  },
+  "J2D": {
+    "required": "none"
+  },
+  "J2E": {
+    "required": "none"
+  },
+  "J2F": {
+    "required": "none"
+  },
+  "J2G": {
+    "required": "none"
+  },
+  "J2H": {
+    "required": "none"
+  },
+  "J2I": {
+    "required": "none"
+  },
+  "club-01": {
+    "required": "none"
+  },
+  "club-02": {
+    "required": "none"
+  },
+  "club-03": {
+    "required": "none"
+  },
+  "club-04": {
+    "required": "none"
+  },
+  "club-05": {
+    "required": "none"
+  },
+  "club-06": {
+    "required": "none"
+  },
+  "club-07": {
+    "required": "none"
+  },
+  "club-08": {
+    "required": "none"
+  },
+  "club-09": {
+    "required": "none"
+  },
+  "club-10": {
+    "required": "none"
+  },
+  "club-11": {
+    "required": "none"
+  },
+  "club-12": {
+    "required": "none"
+  },
+  "club-13": {
+    "required": "none"
+  },
+  "club-14": {
+    "required": "none"
+  },
+  "club-15": {
+    "required": "none"
+  },
+  "club-16": {
+    "required": "none"
+  },
+  "club-17": {
+    "required": "none"
+  },
+  "club-18": {
+    "required": "none"
+  },
+  "club-19": {
+    "required": "none"
+  },
+  "club-20": {
+    "required": "none"
+  },
+  "club-21": {
+    "required": "none"
+  },
+  "club-22": {
+    "required": "none"
+  },
+  "club-23": {
+    "required": "none"
+  },
+  "club-24": {
+    "required": "none"
+  },
+  "club-25": {
+    "required": "none"
+  },
+  "club-26": {
+    "required": "none"
+  },
+  "club-27": {
+    "required": "none"
+  },
+  "club-28": {
+    "required": "none"
+  },
+  "club-29": {
+    "required": "none"
+  },
+  "club-30": {
+    "required": "none"
+  },
+  "club-31": {
+    "required": "none"
+  },
+  "club-32": {
+    "required": "none"
+  },
+  "club-33": {
+    "required": "none"
+  },
+  "club-34": {
+    "required": "none"
+  },
+  "club-35": {
+    "required": "none"
+  },
+  "club-36": {
+    "required": "none"
+  },
+  "club-37": {
+    "required": "none"
+  },
+  "club-38": {
+    "required": "none"
+  },
+  "club-39": {
+    "required": "none"
+  },
+  "club-40": {
+    "required": "none"
+  },
+  "club-41": {
+    "required": "none"
+  },
+  "club-42": {
+    "required": "none"
+  },
+  "club-43": {
+    "required": "none"
+  },
+  "club-44": {
+    "required": "none"
+  },
+  "club-45": {
+    "required": "none"
+  },
+  "club-46": {
+    "required": "none"
+  }
+}

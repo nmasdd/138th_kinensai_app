@@ -303,19 +303,21 @@ function GroupCard({ group, onPress }: { group: StageGroup; onPress: () => void 
   );
 }
 
-/** 出演団体のカード一覧。ステージ・講堂の両タブで共通表示する (土日共通)。 */
+/** 出演団体のカード一覧。ステージ・講堂の両タブで共通表示する。 */
 function PerformerList({
   groups,
   onSelect,
+  title = '出演団体',
 }: {
   groups: StageGroup[];
   onSelect: (g: StageGroup) => void;
+  title?: string;
 }) {
   const { type } = useM3();
   const styles = useStyles();
   return (
     <Rise delay={120}>
-      <Text style={[type.headlineSmall, { color: m3.onSurface }]}>出演団体</Text>
+      <Text style={[type.headlineSmall, { color: m3.onSurface }]}>{title}</Text>
       <View style={styles.groupList}>
         {groups.length === 0 ? (
           <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
@@ -390,9 +392,10 @@ export default function TimetableScreen() {
 
   // 講堂の出演団体は time/Auditorium.csv の演目名を正とし、
   // auditorium-groups.json のメタ情報 (紹介文・写真) を突き合わせる。
+  // 出演団体は選択中の曜日で分ける (土=音楽祭 / 日=海神)。
   const auditoriumGroups = useMemo(
-    () => auditoriumGroupsForItems(items, auditoriumMeta),
-    [items, auditoriumMeta],
+    () => auditoriumGroupsForItems(dayItems, auditoriumMeta),
+    [dayItems, auditoriumMeta],
   );
 
   const dateInfo = festival.dates[day === 1 ? 1 : 0];
@@ -466,7 +469,26 @@ export default function TimetableScreen() {
                 )}
               </View>
             </Rise>
-            <PerformerList groups={auditoriumGroups} onSelect={openDetail} />
+            {day === 1 ? (
+              <>
+                <PerformerList
+                  groups={auditoriumGroups.filter((g) => g.genre === 'スマブラ')}
+                  onSelect={openDetail}
+                  title="出演者（スマブラ）"
+                />
+                <PerformerList
+                  groups={auditoriumGroups.filter((g) => g.genre === 'スプラトゥーン')}
+                  onSelect={openDetail}
+                  title="出演者（スプラトゥーン）"
+                />
+              </>
+            ) : (
+              <PerformerList
+                groups={auditoriumGroups}
+                onSelect={openDetail}
+                title={`出演団体（${THEME_NAMES[day]}）`}
+              />
+            )}
           </>
         )}
       </ScrollView>

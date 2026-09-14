@@ -23,7 +23,7 @@
 - 未実装: マップタブ、QR→マップ遷移、通知、ステージ投票、講堂混雑表示。作る場合は仕様書の該当節に従う。
 
 ## データ・素材
-- 同梱の共有コンテンツ正本は `kinensai_app/src/data/bundled/*.json` に集約 (`volunteers.json`=有志45件、`stage-groups.json`=ステージ出演団体、`auditorium-groups.json`=講堂出演団体、`class-catalog.json`=クラス企画38件)。TSはimportするだけにし、リテラルを増やさない。TSリテラルだった `classContent.ts`/旧 `planning/*.txt`/旧 `classCatalog.json` は廃止済み。
+- 同梱の共有コンテンツ正本は `kinensai_app/src/data/bundled/*.json` に集約 (`volunteers.json`=有志46件、`stage-groups.json`=ステージ出演団体13件、`auditorium-groups.json`=講堂出演団体22件、`class-catalog.json`=クラス企画48件)。TSはimportするだけにし、リテラルを増やさない。TSリテラルだった `classContent.ts`/旧 `planning/*.txt`/旧 `classCatalog.json` は廃止済み。
 - `kinensai_app/time/Auditorium.csv` — 講堂タイムテーブル。4列 `team,day,start,end` (`day: 0=土,1=日`)、5列 (ID付き) もパーサが許容。遅延表示・リアルタイム更新は未実装。
 - `HP/` — ホーム画面の文言ソース。`校内マップ/` — PDF/JPGはパンフレット由来で余白が大きいためトリミング・見やすくして使うこと。
 - `metro.config.js` で `.csv,.txt` を `assetExts` に追加済み。消さないこと。ファイルIOは `expo-file-system/legacy` (新APIではない)。

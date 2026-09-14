@@ -22,6 +22,7 @@ const KIND_LABEL: Record<KindFilter, string> = {
 };
 
 function isMogiten(ex: Exhibition): boolean {
+  if (typeof ex.mogiten === 'boolean') return ex.mogiten;
   return /模擬店|屋台|フード|軽食|喫茶|カフェ/.test(`${ex.className}${ex.projectName}${ex.description}`);
 }
 

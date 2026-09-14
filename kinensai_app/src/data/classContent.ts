@@ -18,6 +18,8 @@ interface CatalogEntry {
   detail: string;
   place: string | null;
   kind: string;
+  /** 模擬店として検索の「模擬店」絞り込みに出すか (未指定は従来の正規表現判定) */
+  mogiten?: boolean;
 }
 
 export const CLASS_CATALOG = catalog as CatalogEntry[];

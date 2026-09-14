@@ -38,6 +38,7 @@ import { SHARED_CONTENT_KEYS, clearLocalKey, loadJSON } from '../../data/kvStore
 import { clearRemoteCache, fetchPublishedJSON, getContentUrl, isRemoteContentConfigured, isRemoteContentEnabled, refreshContentVersion } from '../../data/remoteConfig';
 import { validatePublishEntries, type ValidationIssue } from '../../data/validateContent';
 import { rewriteImagesForPublish } from '../../data/imageUpload';
+import { withContentImage } from '../../data/contentImages';
 import { m3 } from '../../theme';
 import { useM3 } from '../../context/responsive';
 
@@ -192,12 +193,14 @@ function AdminDataContent() {
 
   const loadStageGroupsWithFallback = async (): Promise<StageGroup[]> => {
     const parsed = await loadJSON<unknown>('stage-groups.json', null).catch(() => null);
-    return Array.isArray(parsed) ? (parsed as StageGroup[]) : bundledGroups;
+    const list = Array.isArray(parsed) ? (parsed as StageGroup[]) : bundledGroups;
+    return list.map(withContentImage);
   };
 
   const loadAuditoriumGroupsWithFallback = async (): Promise<StageGroup[]> => {
     const parsed = await loadJSON<unknown>('auditorium-groups.json', null).catch(() => null);
-    return Array.isArray(parsed) ? (parsed as StageGroup[]) : bundledAuditoriumGroups;
+    const list = Array.isArray(parsed) ? (parsed as StageGroup[]) : bundledAuditoriumGroups;
+    return list.map(withContentImage);
   };
 
   /**

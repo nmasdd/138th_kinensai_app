@@ -12,9 +12,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 /** 公開画像として許可する形式。 */
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
-/** そのまま配信できるURLか。 */
+/** そのまま配信できるURLか。ローカル開発サーバのURLは公開時に上げ直す。 */
 export function isPublicImageUri(uri: string): boolean {
-  return uri.startsWith('https://') || uri.startsWith('http://');
+  const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//i.test(uri);
+  return !isLocal && (uri.startsWith('https://') || uri.startsWith('http://'));
 }
 
 function extToMime(uri: string): string {

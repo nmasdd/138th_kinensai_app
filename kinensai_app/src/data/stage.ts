@@ -5,6 +5,7 @@ import { useContentEffect } from '../context/useContentRefreshKey';
 import type { StageItem } from './timetable';
 import stageGroupsJson from './bundled/stage-groups.json';
 import auditoriumGroupsJson from './bundled/auditorium-groups.json';
+import { withContentImage } from './contentImages';
 
 /**
  * 出演団体。ステージ (野外ステージ) と講堂でデータを分けて管理する。
@@ -94,7 +95,7 @@ export async function saveAuditoriumGroups(groups: StageGroup[]): Promise<void> 
 export function usePerformerGroups(kind: 'stage' | 'auditorium' = 'stage') {
   const fallback = kind === 'auditorium' ? bundledAuditoriumGroups : bundledGroups;
   const key = kind === 'auditorium' ? AUDITORIUM_GROUPS_KEY : GROUPS_KEY;
-  const [groups, setGroups] = useState<StageGroup[]>(fallback);
+  const [groups, setGroups] = useState<StageGroup[]>(() => fallback.map(withContentImage));
   const [votedId, setVotedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -118,7 +119,7 @@ export function usePerformerGroups(kind: 'stage' | 'auditorium' = 'stage') {
         })(),
       ]);
       if (cancelled) return;
-      setGroups(loadedGroups);
+      setGroups(loadedGroups.map(withContentImage));
       if (savedVote) setVotedId(savedVote);
       setIsLoading(false);
     })();
@@ -156,11 +157,12 @@ export function auditoriumGroupsForItems(items: StageItem[], meta: StageGroup[])
     seen.add(it.team);
     const m = byName.get(it.team);
     out.push(
-      m ?? {
-        id: `aud-${it.team}`,
-        name: it.team,
-        detail: '紹介文は準備中です。',
-      },
+      m ??
+        withContentImage({
+          id: `aud-${it.team}`,
+          name: it.team,
+          detail: '紹介文は準備中です。',
+        }),
     );
   }
   return out;

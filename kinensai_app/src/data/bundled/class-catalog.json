@@ -59,7 +59,7 @@
     "id": "1H",
     "className": "１H",
     "title": "機動戦士ガンダム　－方舟のエクソダス－",
-    "detail": "アムロ達ホワイトベース隊に課せられたのは東海までの避難民護送任務。君は生き延びることができるか？\n愛と呪いの物語の結末を見逃すな！！",
+    "detail": "アムロ達ホワイトベース隊に課せられたのは東海までの避難民護送任務。君は生き延びることができるか？",
     "place": null,
     "kind": "class"
   },
@@ -99,7 +99,7 @@
     "id": "2C",
     "className": "2C",
     "title": "爆弾",
-    "detail": "「皆さんに警告です。校内に爆弾を仕掛けました。条件が満たされた時爆発します。」爆弾のを見つけ出せ。",
+    "detail": "「皆さんに警告です。校内に爆弾を仕掛けました。条件が満たされた時爆発します。」爆弾を見つけ出せ。",
     "place": null,
     "kind": "class"
   },
@@ -122,14 +122,6 @@
   {
     "id": "2F",
     "className": "2F",
-    "title": "美女と賭博",
-    "detail": "傾国の美女と魂を賭けた享楽と熱狂の渦へ！ 己の誇りと度胸を信じて進め！",
-    "place": null,
-    "kind": "class"
-  },
-  {
-    "id": "2F-2",
-    "className": "２F",
     "title": "Club girlsnight.⋆𖤐",
     "detail": "傾国の美女と魂をかけた大博打！誇りにかけて賭博に踊れ！",
     "place": null,
@@ -166,6 +158,96 @@
     "detail": "〜招待状〜\n腕のいい探偵たちへ\n解決して欲しい未解決事件がある\n\nげえむにさんかしろ AT 2j\n   　  　　　　　　　　　　Kより",
     "place": null,
     "kind": "class"
+  },
+  {
+    "id": "3A",
+    "className": "3A",
+    "title": "単振堂",
+    "detail": "TAKOYAKI BOYZなる東海生が計算し尽くした「単振堂」の揚げたこ焼き。「腹」を満たして、心の振幅を強め合おう。",
+    "place": null,
+    "kind": "class",
+    "mogiten": true
+  },
+  {
+    "id": "3B",
+    "className": "3B",
+    "title": "いま何時？クルンジ",
+    "detail": "クロワッサンをギュッと潰してサクサク食感に！話題の韓国スイーツ「クルンジ」、香ばしい焼きたてを召し上がれ！",
+    "place": null,
+    "kind": "class",
+    "mogiten": true
+  },
+  {
+    "id": "3C",
+    "className": "3C",
+    "title": "これさえ食べれば桜が咲く頃には受験受かったルネードポテト",
+    "detail": "日々受験戦争に勤しむ我々3Cがお届けする至極の一品。来年の春への希望を胸に、いただきます。",
+    "place": null,
+    "kind": "class",
+    "mogiten": true
+  },
+  {
+    "id": "3D",
+    "className": "3D",
+    "title": "Waffる。",
+    "detail": "皆さんが自分でチョコやメープルシロップ、アイスなどのトッピングを決めて、好きな味でワッフルを楽しむことができます！",
+    "place": null,
+    "kind": "class",
+    "mogiten": true
+  },
+  {
+    "id": "3E",
+    "className": "3E",
+    "title": "麺屋ののち",
+    "detail": "漢のロマン二郎ガツンと食べごたえ十分な東海生のこだわりの一杯、ぜひご賞味あれ #二郎だけど二浪は避けたい",
+    "place": null,
+    "kind": "class",
+    "mogiten": true
+  },
+  {
+    "id": "3F",
+    "className": "3F",
+    "title": "King Pro\"patty\"",
+    "detail": "ふっくらバンズでパティを\"はさみうち\"にし、味を\"極限\"まで追求したバーガー。旨さの\"極値\"で、お客様を幸せ気分に。",
+    "place": null,
+    "kind": "class",
+    "mogiten": true
+  },
+  {
+    "id": "3G",
+    "className": "3G",
+    "title": "チ。-チャーハンはギョーザのついで-",
+    "detail": "「餃子がご飯の脇役」という固定観念に挑戦。あくまで「炒飯は餃子のついで」とし、食べた者にコペルニクス的転回をもたらす。",
+    "place": null,
+    "kind": "class",
+    "mogiten": true
+  },
+  {
+    "id": "3H",
+    "className": "3H",
+    "title": "鳥海族",
+    "detail": "「速い！安い！美味い！」の三拍子が揃った鳥海族が東海に出張販売！またとないこの絶好のチャンスを見逃すな！",
+    "place": null,
+    "kind": "class",
+    "mogiten": true
+  },
+  {
+    "id": "3I",
+    "className": "3I",
+    "title": "Baisen",
+    "detail": "私達がこの模擬店で販売するのはチュロスです。シナモンやチョコなど、様々な味付けを楽しむことができます。",
+    "place": null,
+    "kind": "class",
+    "mogiten": true
+  },
+  {
+    "id": "3J",
+    "className": "3J",
+    "title": "揚げパン本仕込み",
+    "detail": "4種類の味から選べる揚げパンと見た目もかわいいフルーツ飴の二本立て！！甘くておいしいスイーツを、ぜひご賞味あれ!!",
+    "place": null,
+    "kind": "class",
+    "mogiten": true
   },
   {
     "id": "J3A",
@@ -276,6 +358,14 @@
     "className": "中学2E",
     "title": "～ゲームから学ぶ～　世界の風習と歴史",
     "detail": "世界各地のゲームからその土地の風習や歴史を楽しく学ぶ。あなたはどれだけ知っていますか？",
+    "place": null,
+    "kind": "class"
+  },
+  {
+    "id": "J2F",
+    "className": "中学2F",
+    "title": "君の名は。〜your name〜",
+    "detail": "決して出会うことはない2人。それでも俺は、私は、ずっと誰か1人を探している。",
     "place": null,
     "kind": "class"
   },
