@@ -41,8 +41,8 @@ function sanitizeRoom(v: unknown): VectorRoom | null {
     name: typeof r.name === 'string' && r.name ? r.name : r.id,
     x: num(r.x, 0),
     y: num(r.y, 0),
-    w: Math.max(8, num(r.w, 60)),
-    h: Math.max(8, num(r.h, 60)),
+    w: num(r.w, 60),
+    h: num(r.h, 60),
     kind,
   };
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -34,35 +34,50 @@ const KIND_OPTIONS: { value: VectorRoom['kind']; label: string }[] = [
   { value: 'hall', label: 'その他' },
 ];
 
-function clamp(v: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, v));
-}
-
 function NumField({
   label,
   value,
-  min,
   onChange,
 }: {
   label: string;
   value: number;
-  min: number;
   onChange: (n: number) => void;
 }) {
   const { type } = useM3();
   const adminStyles = useAdminStyles();
   const styles = useStyles();
+  const [text, setText] = useState(() => String(value));
+  const focused = useRef(false);
+
+  // 外部 (nudge/地図タップ) で値が変わったとき、未編集なら表示を追従させる
+  useEffect(() => {
+    if (!focused.current) setText(String(value));
+  }, [value]);
+
+  const commit = () => {
+    focused.current = false;
+    const n = parseInt(text.replace(/[^0-9-]/g, ''), 10);
+    if (Number.isFinite(n)) {
+      onChange(n);
+      setText(String(n));
+    } else {
+      setText(String(value));
+    }
+  };
+
   return (
     <View style={styles.numField}>
       <Text style={[type.labelMedium, { color: m3.onSurfaceVariant }]}>{label}</Text>
       <TextInput
         style={adminStyles.input}
-        value={String(value)}
-        keyboardType="number-pad"
-        onChangeText={(t) => {
-          const n = parseInt(t.replace(/[^0-9-]/g, ''), 10);
-          if (Number.isFinite(n)) onChange(Math.max(min, n));
+        value={text}
+        keyboardType="numeric"
+        onFocus={() => {
+          focused.current = true;
         }}
+        onChangeText={(t) => setText(t.replace(/[^0-9-]/g, ''))}
+        onBlur={commit}
+        onSubmitEditing={commit}
         accessibilityLabel={label}
       />
     </View>
@@ -128,16 +143,16 @@ function AdminMapContent() {
   const nudge = (dx: number, dy: number) => {
     if (!selected) return;
     patchSelected({
-      x: Math.round(clamp(selected.x + dx, 0, WORLD_W - selected.w)),
-      y: Math.round(clamp(selected.y + dy, 0, WORLD_H - selected.h)),
+      x: Math.round(selected.x + dx),
+      y: Math.round(selected.y + dy),
     });
   };
 
   const moveSelectedTo = (p: { x: number; y: number }) => {
     if (!selected) return;
     patchSelected({
-      x: Math.round(clamp(p.x * WORLD_W - selected.w / 2, 0, WORLD_W - selected.w)),
-      y: Math.round(clamp(p.y * WORLD_H - selected.h / 2, 0, WORLD_H - selected.h)),
+      x: Math.round(p.x * WORLD_W - selected.w / 2),
+      y: Math.round(p.y * WORLD_H - selected.h / 2),
     });
   };
 
@@ -229,6 +244,7 @@ function AdminMapContent() {
             selfPos={null}
             roomsOverride={rooms}
             roomsTappable
+            pickUnclamped
             onPick={moveSelectedTo}
             onSelect={(id) => setSelectedId(id)}
           />
@@ -280,10 +296,10 @@ function AdminMapContent() {
               </Field>
               <Field label="座標・サイズ (1000×700 のマス目)">
                 <View style={styles.numGrid}>
-                  <NumField label="X" value={selected.x} min={-200} onChange={(n) => patchSelected({ x: n })} />
-                  <NumField label="Y" value={selected.y} min={-200} onChange={(n) => patchSelected({ y: n })} />
-                  <NumField label="幅" value={selected.w} min={8} onChange={(n) => patchSelected({ w: n })} />
-                  <NumField label="高さ" value={selected.h} min={8} onChange={(n) => patchSelected({ h: n })} />
+                  <NumField label="X" value={selected.x} onChange={(n) => patchSelected({ x: n })} />
+                  <NumField label="Y" value={selected.y} onChange={(n) => patchSelected({ y: n })} />
+                  <NumField label="幅" value={selected.w} onChange={(n) => patchSelected({ w: n })} />
+                  <NumField label="高さ" value={selected.h} onChange={(n) => patchSelected({ h: n })} />
                 </View>
               </Field>
               <Field label="位置の微調整 (10ずつ)">

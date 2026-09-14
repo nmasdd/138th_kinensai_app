@@ -21,6 +21,8 @@ interface Props {
   roomsOverride?: VectorRoom[] | null;
   /** 指定すると地図タップで絶対位置 (0〜1 の相対座標) を返す作成モードになる */
   onPick?: (p: { x: number; y: number }) => void;
+  /** onPick の座標を 0〜1 にクランプしない (管理者の枠外配置編集用) */
+  pickUnclamped?: boolean;
   /** onPick があっても部屋タップで onSelect を発火させる (配置編集モード用) */
   roomsTappable?: boolean;
   onSelect: (id: string) => void;
@@ -96,7 +98,7 @@ function VendingMachineIcon({ size, color }: { size: number; color: string }) {
  * 画像埋め込みなし。ドラッグでパン、ピンチ/ホイール/ダブルタップ/ボタンでズーム。
  * 部屋は vectorMap.ts の模式図、展示マーカーは mapHotspots.ts と展示IDで対応。
  */
-export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride, onPick, roomsTappable, onSelect }: Props) {
+export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride, onPick, pickUnclamped, roomsTappable, onSelect }: Props) {
   const { type, scale: uiScale } = useM3();
   const styles = useStyles();
   const [fit, setFit] = useState(FIT_FALLBACK);
@@ -117,28 +119,57 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
   useEffect(() => {
     onPickRef.current = onPick;
   }, [onPick]);
+  const pickUnclampedRef = useRef(pickUnclamped);
+  useEffect(() => {
+    pickUnclampedRef.current = pickUnclamped;
+  }, [pickUnclamped]);
 
   const rooms = useMemo(() => roomsOverride ?? VECTOR_ROOMS[floor] ?? [], [roomsOverride, floor]);
 
+  // 部屋の外接矩形 (世界 0..WORLD_W / 0..WORLD_H を必ず含む)。
+  // 枠外に置かれた部屋にも fit とパン範囲を追従させる。
+  const contentBounds = useMemo(() => {
+    let minX = 0;
+    let minY = 0;
+    let maxX = WORLD_W;
+    let maxY = WORLD_H;
+    for (const r of rooms) {
+      minX = Math.min(minX, r.x);
+      minY = Math.min(minY, r.y);
+      maxX = Math.max(maxX, r.x + r.w);
+      maxY = Math.max(maxY, r.y + r.h);
+    }
+    return { minX, minY, maxX, maxY };
+  }, [rooms]);
+  const boundsRef = useRef(contentBounds);
+
   const calcFit = (vw: number, vh: number): number => {
     if (vw <= 0 || vh <= 0) return fitRef.current;
-    // 全体が余白付きで収まる倍率 (初期表示=全体表示)
-    return Math.min(vw / WORLD_W, vh / WORLD_H) * 0.98;
+    // 内容全体が余白付きで収まる倍率 (初期表示=全体表示)
+    const b = boundsRef.current;
+    const w = Math.max(1, b.maxX - b.minX);
+    const h = Math.max(1, b.maxY - b.minY);
+    return Math.min(vw / w, vh / h) * 0.98;
   };
 
   const apply = (s: number, x: number, y: number) => {
     const minS = fitRef.current;
     const cs = clamp(s, minS, MAX_SCALE);
-    // スケール後のワールドとはみ出し量からパン範囲を算出 (fit時はほぼ動かさない)
     const vw = viewW.current;
     const vh = viewH.current;
-    const overX = vw > 0 ? Math.max(0, (WORLD_W * cs - vw) / 2) : 400;
-    const overY = vh > 0 ? Math.max(0, (WORLD_H * cs - vh) / 2) : 400;
+    const b = boundsRef.current;
+    const contentW = Math.max(1, b.maxX - b.minX);
+    const contentH = Math.max(1, b.maxY - b.minY);
+    const ocx = (b.minX + b.maxX) / 2 - WORLD_W / 2;
+    const ocy = (b.minY + b.maxY) / 2 - WORLD_H / 2;
+    // スケール後の内容とはみ出し量からパン範囲を算出
+    const overX = vw > 0 ? Math.max(0, (contentW * cs - vw) / 2) : 400;
+    const overY = vh > 0 ? Math.max(0, (contentH * cs - vh) / 2) : 400;
     const margin = 60;
-    const maxX = overX + margin;
-    const maxY = overY + margin;
-    const cx = clamp(x, -maxX, maxX);
-    const cy = clamp(y, -maxY, maxY);
+    const centerTx = -ocx * cs;
+    const centerTy = -ocy * cs;
+    const cx = clamp(x, centerTx - overX - margin, centerTx + overX + margin);
+    const cy = clamp(y, centerTy - overY - margin, centerTy + overY + margin);
     state.current.scale = cs;
     state.current.tx = cx;
     state.current.ty = cy;
@@ -146,6 +177,30 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
     setTx(cx);
     setTy(cy);
   };
+
+  // 内容中心を画面中央へ合わせて全体表示する
+  const applyContentFit = (s: number) => {
+    const b = boundsRef.current;
+    const ocx = (b.minX + b.maxX) / 2 - WORLD_W / 2;
+    const ocy = (b.minY + b.maxY) / 2 - WORLD_H / 2;
+    apply(s, -ocx * s, -ocy * s);
+  };
+
+  // 外接矩形が変わったら fit を更新し、全体表示中なら追従させる
+  useEffect(() => {
+    boundsRef.current = contentBounds;
+    const vw = viewW.current;
+    const vh = viewH.current;
+    if (vw <= 0 || vh <= 0) return;
+    const prevFit = fitRef.current;
+    const nextFit = calcFit(vw, vh);
+    fitRef.current = nextFit;
+    setFit(nextFit);
+    if (didFitRef.current && Math.abs(state.current.scale - prevFit) < 0.01) {
+      applyContentFit(nextFit);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contentBounds]);
 
   // マップ枠の画面上の位置を測る (ジェスチャー位置のローカル座標換算に使う)
   const measureWrap = (cb: (left: number, top: number, width: number, height: number) => void) => {
@@ -349,7 +404,13 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
             const dy = pageY - top - height / 2;
             const wx = WORLD_W / 2 + (dx - state.current.tx) / state.current.scale;
             const wy = WORLD_H / 2 + (dy - state.current.ty) / state.current.scale;
-            cb({ x: clamp(wx / WORLD_W, 0, 1), y: clamp(wy / WORLD_H, 0, 1) });
+            const nx = wx / WORLD_W;
+            const ny = wy / WORLD_H;
+            cb(
+              pickUnclampedRef.current
+                ? { x: nx, y: ny }
+                : { x: clamp(nx, 0, 1), y: clamp(ny, 0, 1) },
+            );
           });
         },
         onPanResponderTerminate: () => {
@@ -362,7 +423,7 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
   // ボタン操作は画面中央を基準にする
   const zoomIn = () => zoomAt(state.current.scale * 1.4, viewW.current / 2, viewH.current / 2);
   const zoomOut = () => zoomAt(state.current.scale / 1.4, viewW.current / 2, viewH.current / 2);
-  const reset = () => apply(fitRef.current, 0, 0);
+  const reset = () => applyContentFit(fitRef.current);
   // QR読取位置の部屋へセンタリング (リセットとは別動作)
   const centerOnLoc = () => {
     const target = rooms.find((r) => locId != null && (r.id === locId || r.name.includes(locId)));
@@ -413,10 +474,10 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
           setFit(nextFit);
           if (!didFitRef.current) {
             didFitRef.current = true;
-            apply(nextFit, 0, 0);
+            applyContentFit(nextFit);
           } else if (Math.abs(state.current.scale - prevFit) < 0.01) {
             // 全体表示のままサイズが変わったら追従
-            apply(nextFit, 0, 0);
+            applyContentFit(nextFit);
           }
           centerOnSelf();
         }}
@@ -434,6 +495,8 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
           ))}
         </View>
         {rooms.map((r) => {
+          // サイズ 0 以下は描画不能 (RN は負の width/height を扱えない) ため非表示
+          if (r.w <= 0 || r.h <= 0) return null;
           const active = isActiveRoom(r);
           const isLoc = isLocRoom(r);
           const tappable =
