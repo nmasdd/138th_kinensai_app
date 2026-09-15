@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
+import Head from 'expo-router/head';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -23,6 +24,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { m3, scaled, type M3Shape } from '../theme';
 import { useM3 } from '../context/responsive';
+import { pageTitle } from '../data/pageTitles';
 
 export type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
@@ -88,13 +90,17 @@ export function M3Icon({ name, size = 24, color = m3.onSurface }: { name: IconNa
 }
 
 /** 高さ 64 のスモールトップアプリバー。左 menu→メニュー、右 notifications→通知。 */
-export function TopAppBar({ title }: { title: string }) {
+export function TopAppBar({ title, headTitle }: { title: string; headTitle?: string }) {
   const styles = useStyles();
   const { type } = useM3();
   // メニュー画面では同じボタンが「閉じる」として働く (トグル)
   const onMenu = usePathname() === '/menu';
   return (
     <View style={styles.appBar} accessibilityRole="header">
+      {/* Web のブラウザタブに表示するタイトル (headTitle 未指定なら画面名) */}
+      <Head>
+        <title>{pageTitle(headTitle ?? title)}</title>
+      </Head>
       <Pressable
         accessibilityLabel={onMenu ? 'メニューを閉じる' : 'メニューを開く'}
         accessibilityRole="button"

@@ -22,6 +22,12 @@ Read versioned docs at https://docs.expo.dev/versions/v56.0.0/ before writing co
 - Content freshness ≤30s: the Worker serves shared content with `max-age=15, stale-while-revalidate=15` and exposes `GET /api/content/_meta.json` (`{version,updatedAt}`); publish bumps `version`. `src/data/remoteConfig.ts` polls `_meta.json` (startup, `AppState` foreground, every 15s) and appends `?v=<version>` to fetches. `src/context/useContentRefreshKey.ts` (`useContentEffect`) re-runs screen loaders on version change; the root layout calls `useContentAutoRefresh()`.
 - Map images in repo-root `校内マップ/` are outside the Metro bundle; place used images under `assets/maps/` before wiring into `src/app/map.tsx`.
 
+## Web shell / PWA
+- Browser tab titles come from `TopAppBar` (`src/components/m3.tsx`) rendering `expo-router/head` `<Head><title>` with `src/data/pageTitles.ts` `pageTitle()`. `options.title` does NOT set `document.title` on web in this version.
+- Root HTML is `src/app/+html.tsx` (web-only, Node during export): `lang="ja"`, description, theme-color, manifest, apple meta. Do not add `<link rel="icon">` (expo CLI injects `/favicon.ico` from `app.json` `web.favicon`).
+- PWA: `public/manifest.webmanifest`, `public/sw.js` (cache name `kinensai-v1`; skips `/api/`), icons under `public/icons/`. Registration lives in `src/utils/serviceWorker.ts`, called from `_layout.web.tsx` only when `!__DEV__`.
+- Regenerate every icon (app + PWA) from `icon/logo.png` with `python tools/icons/gen_icons.py`.
+
 ## Dev vs prod
 - `src/data/remoteConfig.ts`: in dev (`__DEV__`) remote content is OFF by default (bundled values only, no prod-KV fetch/errors). Opt in with `EXPO_PUBLIC_ENABLE_REMOTE_CONTENT=1`; override the URL with `EXPO_PUBLIC_CONTENT_URL`. Prod builds always fetch.
 - Admin auth is required by default. For local work only, `EXPO_PUBLIC_ADMIN_BYPASS=1` (dev-only; ignored in prod builds).

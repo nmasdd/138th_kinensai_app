@@ -1,0 +1,33 @@
+{
+  "name": "138th 記念祭",
+  "short_name": "記念祭",
+  "description": "東海中学校・高等学校 138th 記念祭の公式アプリ。タイムテーブル・企画検索・校内マップ・QR読み取りなどを確認できます。",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "ja",
+  "dir": "ltr",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "categories": ["education", "events", "navigation"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,7 +1,9 @@
 import { Stack } from 'expo-router/js-stack';
+import { useEffect } from 'react';
 import { useReducedMotion } from 'react-native-reanimated';
 import { ResponsiveProvider } from '../context/responsive';
 import { useContentAutoRefresh } from '../context/useContentAutoRefresh';
+import { registerServiceWorker } from '../utils/serviceWorker';
 
 /**
  * Web 用ルートレイアウト。
@@ -10,10 +12,14 @@ import { useContentAutoRefresh } from '../context/useContentAutoRefresh';
  * 空間的な連続性を示す (HIG)。「視差効果を減らす」設定時はアニメーションしない。
  * useContentAutoRefresh で公開コンテンツの版数を監視し (起動時・復帰時・15秒毎)、
  * 更新があれば各画面へ通知して30秒以内に反映する。
+ * 本番ビルドでは PWA 用の Service Worker を登録する (ホーム画面追加・オフライン起動)。
  */
 export default function RootLayout() {
   const reduced = useReducedMotion();
   useContentAutoRefresh();
+  useEffect(() => {
+    if (!__DEV__) registerServiceWorker();
+  }, []);
   return (
     <ResponsiveProvider>
       <Stack

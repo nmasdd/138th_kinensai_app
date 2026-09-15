@@ -57,7 +57,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <TopAppBar title="ホーム" />
+      <TopAppBar title="ホーム" headTitle="" />
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <Rise delay={60}>
           <M3Card variant="outlined">
