@@ -460,6 +460,11 @@ export default function TimetableScreen() {
                   <Text style={[type.headlineSmall, { color: m3.onSurface }]}>講堂 {THEME_NAMES[day]}</Text>
                   <CongestionChip level={congestion} />
                 </View>
+                {day === 1 ? (
+                  <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
+                    日曜企画（クラブ・有志）は時間未定のため一覧のみ表示しています
+                  </Text>
+                ) : null}
               </View>
               <View style={styles.calCard}>
                 {dayItems.length === 0 ? (
@@ -480,6 +485,11 @@ export default function TimetableScreen() {
                   groups={auditoriumGroups.filter((g) => g.genre === 'スプラトゥーン')}
                   onSelect={openDetail}
                   title="出演者（スプラトゥーン）"
+                />
+                <PerformerList
+                  groups={auditoriumMeta.filter((g) => g.genre === 'クラブ')}
+                  onSelect={openDetail}
+                  title="日曜企画（クラブ・有志）"
                 />
               </>
             ) : (

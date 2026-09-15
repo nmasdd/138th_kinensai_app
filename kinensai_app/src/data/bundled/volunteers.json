@@ -7,6 +7,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "体験企画"
+    ],
     "place": "スタディーホール"
   },
   {
@@ -17,6 +20,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "実演発表"
+    ],
     "place": "中学3階工作室"
   },
   {
@@ -27,6 +33,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "事務室前"
   },
   {
@@ -37,6 +46,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "クラブ"
+    ],
     "place": "講堂"
   },
   {
@@ -47,6 +59,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "実演発表"
+    ],
     "place": "明照殿"
   },
   {
@@ -57,6 +72,10 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "実演発表",
+      "販売・配布"
+    ],
     "place": "事務室前"
   },
   {
@@ -67,6 +86,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "クラブ"
+    ],
     "place": "講堂、ステージ、中庭"
   },
   {
@@ -77,6 +99,10 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "体験企画",
+      "展示"
+    ],
     "place": "英語リスニングルーム"
   },
   {
@@ -87,6 +113,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "実演発表"
+    ],
     "place": "高校201補助教室"
   },
   {
@@ -97,6 +126,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "販売・配布"
+    ],
     "place": "英語コミュニケーションルーム",
     "mogiten": false
   },
@@ -108,6 +140,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "体験企画"
+    ],
     "place": "多目的室"
   },
   {
@@ -118,6 +153,10 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示",
+      "販売・配布"
+    ],
     "place": "事務室前"
   },
   {
@@ -128,6 +167,10 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "実演発表",
+      "展示"
+    ],
     "place": "事務室前"
   },
   {
@@ -138,6 +181,10 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "実演発表",
+      "展示"
+    ],
     "place": "205補助教室"
   },
   {
@@ -148,6 +195,10 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示",
+      "販売・配布"
+    ],
     "place": "大回廊"
   },
   {
@@ -168,6 +219,11 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "体験企画",
+      "展示",
+      "販売・配布"
+    ],
     "place": "高校面談室1,2,3,4"
   },
   {
@@ -178,6 +234,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "204補助教室"
   },
   {
@@ -188,6 +247,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "クラブ"
+    ],
     "place": "講堂"
   },
   {
@@ -198,6 +260,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "中学2階学習室"
   },
   {
@@ -208,6 +273,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "販売・配布"
+    ],
     "place": "高校会議室"
   },
   {
@@ -218,6 +286,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "実演発表"
+    ],
     "place": "中学1階学習室"
   },
   {
@@ -228,6 +299,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "実演発表"
+    ],
     "place": "中学1階学習室"
   },
   {
@@ -238,6 +312,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "203補助教室"
   },
   {
@@ -248,6 +325,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "放送室前"
   },
   {
@@ -258,6 +338,10 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "体験企画",
+      "研究発表"
+    ],
     "place": "事務室前"
   },
   {
@@ -268,6 +352,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "実演発表"
+    ],
     "place": "ステージ"
   },
   {
@@ -278,6 +365,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "技術室"
   },
   {
@@ -298,6 +388,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "販売・配布"
+    ],
     "place": "本館下ピロティ",
     "mogiten": false
   },
@@ -309,6 +402,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "体験企画"
+    ],
     "place": "視聴覚室"
   },
   {
@@ -319,6 +415,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "体験企画"
+    ],
     "place": "中学4階学習室"
   },
   {
@@ -329,6 +428,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "3階美術室"
   },
   {
@@ -339,6 +441,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "研究発表"
+    ],
     "place": "中学面談室1,2,3,4"
   },
   {
@@ -349,6 +454,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "中学２階学習室"
   },
   {
@@ -359,6 +467,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "体験企画"
+    ],
     "place": "中学3階学習室"
   },
   {
@@ -369,6 +480,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "中学面談室5,6,7"
   },
   {
@@ -379,6 +493,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "販売・配布"
+    ],
     "place": "本館西ピロティ"
   },
   {
@@ -389,6 +506,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "体験企画"
+    ],
     "place": "中学生徒会室"
   },
   {
@@ -399,6 +519,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "体験企画"
+    ],
     "place": "中庭"
   },
   {
@@ -409,6 +532,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "クラブ"
+    ],
     "place": "講堂"
   },
   {
@@ -419,6 +545,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "中庭"
   },
   {
@@ -429,6 +558,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "中学4階学習室"
   },
   {
@@ -439,6 +571,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "実演発表"
+    ],
     "place": "高校音楽室"
   },
   {
@@ -449,6 +584,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "大回廊"
   },
   {
@@ -459,6 +597,9 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
+    "genres": [
+      "展示"
+    ],
     "place": "中学一年教室"
   }
 ]

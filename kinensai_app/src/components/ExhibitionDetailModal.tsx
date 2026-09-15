@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { displayClassName, type Exhibition } from '../data/exhibitions';
+import { displayClassName, genreLabel, type Exhibition } from '../data/exhibitions';
 import { ticketDistributionRoom } from '../data/mapRoomNotes';
 import { M3Button, M3Divider, M3Icon, M3ImagePlaceholder, M3Touch, m3scrim } from './m3';
 import { FadeOverlay, Pop } from './anim';
@@ -65,6 +65,11 @@ export default function ExhibitionDetailModal({
               <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 4 }]}>
                 {exhibition.description || '(説明準備中)'}
               </Text>
+              {genreLabel(exhibition) ? (
+                <Text style={[type.labelLarge, { color: m3.onSurfaceVariant, marginTop: 8 }]}>
+                  ジャンル: {genreLabel(exhibition)}
+                </Text>
+              ) : null}
               <M3Divider style={styles.divider} />
               <Text style={[type.bodyMedium, { color: m3.onSurface }]}>{ticketLabel(exhibition)}</Text>
               {exhibition.place && (

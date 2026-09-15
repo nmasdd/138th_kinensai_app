@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { M3Card, M3EmptyState, M3FAB, M3FilterChip, M3Icon, M3ImagePlaceholder, M3LoadingView, M3SearchBar, TopAppBar } from '../../components/m3';
 import { Rise, ScreenFade, Stagger } from '../../components/anim';
 import ExhibitionDetailModal from '../../components/ExhibitionDetailModal';
-import { loadAllExhibitions, displayClassName, type Exhibition } from '../../data/exhibitions';
+import { genreLabel, loadAllExhibitions, matchesGenre, displayClassName, type Exhibition } from '../../data/exhibitions';
 import { useFavorites } from '../../data/favorites';
 import { useM3 } from '../../context/responsive';
 import { useContentEffect } from '../../context/useContentRefreshKey';
@@ -21,6 +21,44 @@ const KIND_LABEL: Record<KindFilter, string> = {
   fav: 'お気に入り',
 };
 
+type GenreFilter =
+  | 'all'
+  | '演劇'
+  | 'テーマツアー'
+  | 'パフォーマンス'
+  | '展示'
+  | '実演発表'
+  | '体験企画'
+  | '販売・配布'
+  | '研究発表'
+  | 'クラブ';
+
+const GENRE_FILTERS: GenreFilter[] = [
+  'all',
+  '演劇',
+  'テーマツアー',
+  'パフォーマンス',
+  '展示',
+  '実演発表',
+  '体験企画',
+  '販売・配布',
+  '研究発表',
+  'クラブ',
+];
+
+const GENRE_LABEL: Record<GenreFilter, string> = {
+  all: 'すべて',
+  演劇: '演劇',
+  テーマツアー: 'テーマツアー',
+  パフォーマンス: 'パフォーマンス',
+  展示: '展示',
+  実演発表: '実演発表',
+  体験企画: '体験企画',
+  '販売・配布': '販売・配布',
+  研究発表: '研究発表',
+  クラブ: 'クラブ',
+};
+
 function isMogiten(ex: Exhibition): boolean {
   if (typeof ex.mogiten === 'boolean') return ex.mogiten;
   return /模擬店|屋台|フード|軽食|喫茶|カフェ/.test(`${ex.className}${ex.projectName}${ex.description}`);
@@ -34,6 +72,7 @@ export default function SearchScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<KindFilter>(filter === 'mogiten' ? 'mogiten' : 'all');
+  const [genre, setGenre] = useState<GenreFilter>('all');
   const [filterOpen, setFilterOpen] = useState(filter === 'mogiten');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -75,14 +114,16 @@ export default function SearchScreen() {
       } else if (kind === 'fav') {
         if (!isFavorite(ex.id)) return false;
       }
+      if (!matchesGenre(ex, genre)) return false;
       if (!q) return true;
       return (
         ex.className.toLowerCase().includes(q) ||
         ex.projectName.toLowerCase().includes(q) ||
-        ex.description.toLowerCase().includes(q)
+        ex.description.toLowerCase().includes(q) ||
+        (genreLabel(ex) ?? '').toLowerCase().includes(q)
       );
     });
-  }, [exhibitions, query, kind, isFavorite]);
+  }, [exhibitions, query, kind, genre, isFavorite]);
 
   const selected = useMemo(
     () => (selectedId ? exhibitions.find((ex) => ex.id === selectedId) ?? null : null),
@@ -141,6 +182,10 @@ export default function SearchScreen() {
           <View style={styles.filterPanel} accessibilityRole="none" accessibilityLabel="絞り込み条件">
           {(Object.keys(KIND_LABEL) as KindFilter[]).map((k) => (
             <M3FilterChip key={k} label={KIND_LABEL[k]} selected={kind === k} onPress={() => setKind(k)} />
+          ))}
+          <Text style={[type.labelLarge, styles.filterHeading]}>ジャンル</Text>
+          {GENRE_FILTERS.map((g) => (
+            <M3FilterChip key={g} label={GENRE_LABEL[g]} selected={genre === g} onPress={() => setGenre(g)} />
           ))}
         </View>
         </Rise>
@@ -230,6 +275,7 @@ function createStyles(s: number) {
       paddingTop: scaled(8, s),
     },
     resultInfo: { paddingHorizontal: scaled(16, s), paddingVertical: scaled(12, s) },
+    filterHeading: { width: '100%', color: m3.onSurfaceVariant, marginTop: scaled(4, s) },
     listWrap: { flex: 1 },
     list: { paddingHorizontal: scaled(16, s), paddingBottom: scaled(96, s), gap: scaled(16, s) },
     card: { padding: 0 },

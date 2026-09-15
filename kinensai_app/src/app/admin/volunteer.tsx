@@ -31,6 +31,7 @@ interface VolDraft {
   projectName: string;
   description: string;
   place: string;
+  genres: string;
   ticket: TicketState;
   ticketTime: string;
   imageUri: string | null;
@@ -42,10 +43,20 @@ const EMPTY_VOL: VolDraft = {
   projectName: '',
   description: '',
   place: '',
+  genres: '',
   ticket: 'unknown',
   ticketTime: '',
   imageUri: null,
 };
+
+/** 「展示、販売・配布」のような入力を配列へ。空なら undefined。 */
+function parseGenres(input: string): string[] | undefined {
+  const list = input
+    .split(/[,、]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return list.length > 0 ? list : undefined;
+}
 
 export default function AdminVolunteerScreen() {
   return (
@@ -101,6 +112,7 @@ function AdminVolunteerContent() {
         ticketTime: volDraft.ticketTime || null,
         kind: 'volunteer',
         place: volDraft.place.trim() || null,
+        genres: parseGenres(volDraft.genres),
         imageUri: volDraft.imageUri,
       };
       const next = volDraft.id ? volunteers.map((v) => (v.id === id ? item : v)) : [...volunteers, item];
@@ -173,6 +185,7 @@ function AdminVolunteerContent() {
                       projectName: v.projectName === '(タイトル未定)' ? '' : v.projectName,
                       description: v.description === '(説明準備中)' ? '' : v.description,
                       place: v.place ?? '',
+                      genres: (v.genres ?? []).join('、'),
                       ticket: v.ticketRequired === 'required' || v.ticketRequired === 'none' ? v.ticketRequired : 'unknown',
                       ticketTime: v.ticketTime ?? '',
                       imageUri: v.imageUri ?? null,
@@ -233,6 +246,15 @@ function AdminVolunteerContent() {
                   value={volDraft.place}
                   onChangeText={(t) => setVolDraft((p) => ({ ...p, place: t }))}
                   placeholder="例: 中庭ステージ"
+                  placeholderTextColor={m3.onSurfaceVariant}
+                />
+              </Field>
+              <Field label="ジャンル (任意・「、」区切り)">
+                <TextInput
+                  style={adminStyles.input}
+                  value={volDraft.genres}
+                  onChangeText={(t) => setVolDraft((p) => ({ ...p, genres: t }))}
+                  placeholder="例: 展示、販売・配布"
                   placeholderTextColor={m3.onSurfaceVariant}
                 />
               </Field>

@@ -15,10 +15,42 @@ export interface Exhibition {
   /** クラス企画 / 教室有志企画の種別 */
   kind: 'class' | 'volunteer';
   place: string | null;
+  /** 大分類ジャンル (クラス企画: 演劇 / テーマツアー / パフォーマンス)。なければ null */
+  genre?: string | null;
+  /** 細分ジャンル (クラス企画: 謎解き・脱出、パロディ 等) */
+  subGenres?: string[];
+  /** 有志企画のジャンル区分 (展示 / 実演発表 / 体験企画 / 販売・配布 / 研究発表 / クラブ) */
+  genres?: string[];
   /** 模擬店として検索の「模擬店」絞り込みに出すか (未指定は従来の正規表現判定) */
   mogiten?: boolean;
   /** 管理者ページで登録した画像 (file:// URI または dataURL)。なければ null */
   imageUri?: string | null;
+}
+
+/**
+ * 企画のジャンル表示文字列を組み立てる。
+ * クラス企画は「大分類／細分、細分」、有志企画は「区分、区分」の形式。
+ * どちらも無ければ null。
+ */
+export function genreLabel(ex: Exhibition): string | null {
+  const classParts: string[] = [];
+  if (ex.genre) classParts.push(ex.genre);
+  if (ex.subGenres && ex.subGenres.length > 0) classParts.push(ex.subGenres.join('、'));
+  const classLabel = classParts.join('／');
+  const volunteerLabel = ex.genres && ex.genres.length > 0 ? ex.genres.join('、') : '';
+  return classLabel || volunteerLabel || null;
+}
+
+/**
+ * ジャンル絞り込みの対象値か (大分類・細分・有志区分のいずれかに一致)。
+ * `genre` が 'all' のときは常に true。
+ */
+export function matchesGenre(ex: Exhibition, genre: string): boolean {
+  if (genre === 'all') return true;
+  if (ex.genre === genre) return true;
+  if (ex.subGenres?.includes(genre)) return true;
+  if (ex.genres?.includes(genre)) return true;
+  return false;
 }
 
 const CATALOG = CLASS_CATALOG;
@@ -114,6 +146,8 @@ export async function loadExhibitions(): Promise<Exhibition[]> {
       ticketTime: ticket?.time ?? null,
       kind: 'class' as const,
       place: ov?.place ?? c.place ?? null,
+      genre: c.genre ?? null,
+      subGenres: c.subGenres ?? [],
       imageUri: ov?.imageUri ?? null,
       mogiten: c.mogiten === true,
     };
@@ -127,6 +161,8 @@ export async function loadExhibitions(): Promise<Exhibition[]> {
       projectName: ov?.title ?? e.projectName,
       description: ov?.detail ?? e.description,
       place: ov?.place ?? e.place ?? null,
+      genre: e.genre ?? null,
+      subGenres: e.subGenres ?? [],
       ticketRequired: ticket?.required ?? e.ticketRequired ?? 'unknown',
       ticketTime: ticket?.time ?? e.ticketTime ?? null,
       imageUri: ov?.imageUri ?? e.imageUri ?? null,

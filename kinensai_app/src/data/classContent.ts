@@ -18,6 +18,10 @@ interface CatalogEntry {
   detail: string;
   place: string | null;
   kind: string;
+  /** 大分類ジャンル (演劇 / テーマツアー / パフォーマンス)。模擬店は未設定 */
+  genre?: string;
+  /** 細分ジャンル (謎解き・脱出、パロディ 等) */
+  subGenres?: string[];
   /** 模擬店として検索の「模擬店」絞り込みに出すか (未指定は従来の正規表現判定) */
   mogiten?: boolean;
 }

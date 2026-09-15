@@ -114,6 +114,46 @@ export default function HomeScreen() {
         </M3Card>
         </Rise>
 
+        <Rise delay={160}>
+          <M3Card variant="outlined">
+            <Text style={[type.titleMedium, { color: m3.onSurface }]}>物販</Text>
+            <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 4 }]}>
+              {festival.shop.place}
+            </Text>
+            <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 2 }]}>
+              {festival.shop.note}
+            </Text>
+            <View style={styles.shopList}>
+              {festival.shop.items.map((item) => (
+                <View key={item.name} style={styles.shopRow}>
+                  <Text style={[type.bodyMedium, { color: m3.onSurface }]}>{item.name}</Text>
+                  <Text style={[type.bodyMedium, { color: m3.onSurface }]}>{item.price}円</Text>
+                </View>
+              ))}
+            </View>
+          </M3Card>
+        </Rise>
+
+        <Rise delay={180}>
+          <M3Card variant="outlined">
+            <Text style={[type.titleMedium, { color: m3.onSurface }]}>食堂</Text>
+            <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 4 }]}>
+              {festival.cafeteria.place}
+            </Text>
+            <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 2 }]}>
+              {festival.cafeteria.note}
+            </Text>
+            <View style={styles.shopList}>
+              {festival.cafeteria.hours.map((h) => (
+                <View key={h.label} style={styles.shopRow}>
+                  <Text style={[type.bodyMedium, { color: m3.onSurface }]}>{h.label}</Text>
+                  <Text style={[type.bodyMedium, { color: m3.onSurface }]}>{h.time}</Text>
+                </View>
+              ))}
+            </View>
+          </M3Card>
+        </Rise>
+
         <Rise delay={200}>
           <M3Card variant="outlined">
           <Text style={[type.titleMedium, { color: m3.onSurface }]}>来場のお願い</Text>
@@ -147,6 +187,8 @@ function createStyles(s: number) {
       overflow: 'hidden',
     },
     note: { marginTop: scaled(12, s), gap: scaled(4, s) },
+    shopList: { marginTop: scaled(8, s), gap: scaled(6, s) },
+    shopRow: { flexDirection: 'row', justifyContent: 'space-between', gap: scaled(12, s) },
   });
 }
 
