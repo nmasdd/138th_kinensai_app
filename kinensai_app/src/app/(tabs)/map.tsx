@@ -1,7 +1,7 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { M3EmptyState, M3Icon, M3LoadingView, M3PrimaryTabs, M3SearchBar, M3Touch, TopAppBar } from '../../components/m3';
 import { Rise, ScreenFade, Stagger } from '../../components/anim';
 import { useContentEffect } from '../../context/useContentRefreshKey';
@@ -13,10 +13,15 @@ import { hotspotForExhibitionId } from '../../data/mapHotspots';
 import { VECTOR_FLOORS, type VectorFloor } from '../../data/vectorMap';
 import { loadMapLayout, annotationsForFloor, roomsForFloor, type MapLayoutOverrides } from '../../data/mapLayout';
 import { roomNoteForId } from '../../data/mapRoomNotes';
+import { delayStatusText, findNow } from '../../data/timetable';
+import { groupStageItems, usePerformerGroups } from '../../data/stage';
 import { useM3 } from '../../context/responsive';
 import { m3, scaled, type M3Shape } from '../../theme';
 
 const FLOOR_LABELS = VECTOR_FLOORS;
+
+/** ベクター校内マップのステージ枠の部屋ID。選択時は「いま開催中の演目」を表示する */
+const STAGE_ROOM_ID = 'sys-stage';
 
 function firstParam(v?: string | string[]): string | undefined {
   return Array.isArray(v) ? v[0] : v;
@@ -84,8 +89,16 @@ export default function MapScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const { isFavorite, toggle } = useFavorites();
+  const { groups: stageGroups } = usePerformerGroups('stage');
+  const [now, setNow] = useState(() => new Date());
   const scrollRef = useRef<ScrollView>(null);
   const appliedFloorRef = useRef<string | null>(null);
+
+  // 「いま開催中」の判定を1分ごとに更新する
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const floorParamRaw = firstParam(floorParam);
   const floorIndexFromParam = floorParamToIndex(floorParamRaw);
@@ -142,6 +155,13 @@ export default function MapScreen() {
   }, [loc, focus, floorIndexFromParam, floorParamRaw]);
 
   const selected = exhibitions.find((e) => e.id === selectedId) ?? null;
+
+  // ステージ枠が選択されたときの「いま開催中の演目」。時刻はステージ出演団体の
+  // day/start/end (管理者が設定) を正とする。未設定なら空配列。
+  const stageItems = useMemo(() => groupStageItems(stageGroups), [stageGroups]);
+  const stageNow = useMemo(() => findNow(stageItems, now), [stageItems, now]);
+  const stageNowGroup = stageNow ? stageGroups.find((g) => g.name === stageNow.team) ?? null : null;
+  const stageNowText = stageNowGroup ? stageNowGroup.intro || stageNowGroup.detail || '' : '';
 
   const coLocated = useMemo(() => {
     if (!selected) return [] as Exhibition[];
@@ -275,6 +295,56 @@ export default function MapScreen() {
                 <Text style={[type.labelLarge, styles.detailLink]}>詳細を見る</Text>
               </M3Touch>
             </>
+          ) : selectedRoom && selectedRoom.id === STAGE_ROOM_ID ? (
+            <>
+              <Text style={[type.titleMedium, { color: m3.onSurface }]}>{selectedRoom.name}</Text>
+              {stageNow ? (
+                <>
+                  <Text style={[type.labelLarge, styles.stageNowBadge]}>いま開催中</Text>
+                  <Text style={[type.titleSmall, { color: m3.onSurface }]}>{stageNow.team}</Text>
+                  <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 2 }]}>
+                    {stageNow.start}–{stageNow.end}
+                    {stageNow.delayMinutes > 0 ? `・${delayStatusText(stageNow.delayMinutes)}` : ''}
+                  </Text>
+                  {stageNowText ? (
+                    <Text
+                      style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 8 }]}
+                      numberOfLines={4}
+                    >
+                      {stageNowText}
+                    </Text>
+                  ) : null}
+                </>
+              ) : (
+                <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 4 }]}>
+                  {stageItems.length === 0
+                    ? 'ステージのタイムテーブルは準備中です。時刻はパンフレットのQRコードまたは「タイムテーブル」タブをご確認ください。'
+                    : 'いま開催中のステージ演目はありません。'}
+                </Text>
+              )}
+              {roomExhibitions.length > 0 ? (
+                <>
+                  <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 12 }]}>
+                    この会場の出演予定
+                  </Text>
+                  {roomExhibitions.map((ex) => (
+                    <M3Touch
+                      key={ex.id}
+                      onPress={() => setSelectedId(ex.id)}
+                      label={`${ex.className}の詳細を表示`}
+                      round
+                    >
+                      <Text style={[type.labelLarge, styles.detailLink]} numberOfLines={1}>
+                        {ex.className} {ex.projectName || '(タイトル未定)'}
+                      </Text>
+                    </M3Touch>
+                  ))}
+                </>
+              ) : null}
+              <M3Touch onPress={() => router.push('/timetable')} label="タイムテーブルを開く" round>
+                <Text style={[type.labelLarge, styles.detailLink]}>タイムテーブルを見る</Text>
+              </M3Touch>
+            </>
           ) : selectedRoom && selectedRoomNote ? (
             <>
               <Text style={[type.titleMedium, { color: m3.onSurface }]}>
@@ -363,6 +433,16 @@ function createStyles(s: number, shape: M3Shape) {
       minHeight: scaled(200, s),
     },
     detailLink: { color: m3.primary, marginTop: scaled(8, s) },
+    stageNowBadge: {
+      alignSelf: 'flex-start',
+      color: m3.onPrimaryContainer,
+      backgroundColor: m3.primaryContainer,
+      paddingHorizontal: scaled(12, s),
+      paddingVertical: scaled(2, s),
+      borderRadius: 999,
+      overflow: 'hidden',
+      marginTop: scaled(8, s),
+    },
     place: {
       flexDirection: 'row',
       alignItems: 'center',

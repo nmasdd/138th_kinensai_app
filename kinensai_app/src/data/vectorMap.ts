@@ -13,6 +13,13 @@ ID規約: 高校HRは `1A` 形式、中学HRはカタログID (`J3A` 等)。特�
 (階段アイコンと混同しないため `stairs` とは区別)。
 */
 export type VectorFloor = '1階' | '2階' | '3階' | '4階 5階';
+
+/**
+ * トイレの性別区分。校内マップ (`校内マップ/*.jpg`) のアイコンに対応する。
+ * 男子=青 / 女子=赤 / 男女=青と赤の2色 (`kind: 'toilet'` のとき有効)。
+ */
+export type ToiletGender = 'male' | 'female' | 'both';
+
 export interface VectorRoom {
   /** 展示IDまたは施設ID (階段/トイレ等は `sys-*`) */
   id: string;
@@ -26,6 +33,8 @@ export interface VectorRoom {
   h: number;
   /** 部屋種別 (色分け用) */
   kind: 'class' | 'jclass' | 'club' | 'corridor' | 'stairs' | 'elevator' | 'vending' | 'toilet' | 'outdoor' | 'hall';
+  /** トイレの性別 (校内マップ由来の色分け・アイコン用)。`kind: 'toilet'` のとき有効 */
+  gender?: ToiletGender;
 }
 export const VECTOR_FLOORS: VectorFloor[] = ['1階', '2階', '3階', '4階 5階'];
 export const VECTOR_ROOMS: Record<VectorFloor, VectorRoom[]> = {
@@ -41,7 +50,7 @@ export const VECTOR_ROOMS: Record<VectorFloor, VectorRoom[]> = {
     { id: "J3G", label: "3G", name: "中学3G", x: 470, y: 60, w: 110, h: 70, kind: "jclass" },
     { id: "J3F", label: "3F", name: "中学3F", x: 580, y: 60, w: 110, h: 70, kind: "jclass" },
     { id: "club-22", label: "1階学習室", name: "1階学習室", x: 690, y: 60, w: 110, h: 70, kind: "club" },
-    { id: "sys-t1ne", label: "", name: "北女子トイレ", x: 800, y: -30, w: 60, h: 60, kind: "toilet" },
+    { id: "sys-t1ne", label: "", name: "北女子トイレ", x: 800, y: -30, w: 60, h: 60, kind: "toilet", gender: "female" },
     { id: "sys-s1wtop", label: "", name: "西上階段", x: 80, y: 100, w: 140, h: 50, kind: "stairs" },
     { id: "1E", label: "1E", name: "高校1E", x: 80, y: 150, w: 140, h: 70, kind: "class" },
     { id: "1F", label: "1F", name: "高校1F", x: 80, y: 220, w: 140, h: 70, kind: "class" },
@@ -49,38 +58,38 @@ export const VECTOR_ROOMS: Record<VectorFloor, VectorRoom[]> = {
     { id: "1H", label: "1H", name: "高校1H", x: 80, y: 360, w: 140, h: 70, kind: "class" },
     { id: "1I", label: "1I", name: "高校1I", x: 80, y: 430, w: 140, h: 70, kind: "class" },
     { id: "1J", label: "1J", name: "高校1J", x: 80, y: 500, w: 140, h: 70, kind: "class" },
-    { id: "sys-t1m", label: "WC", name: "男子トイレ (西)", x: 250, y: 300, w: 50, h: 120, kind: "toilet" },
+    { id: "sys-t1m", label: "", name: "男子トイレ (西)", x: 250, y: 300, w: 50, h: 120, kind: "toilet", gender: "male" },
     { id: "sys-h1j", label: "事務室", name: "事務室", x: 540, y: 390, w: 140, h: 120, kind: "hall" },
     { id: "sys-h1b", label: "放送室", name: "放送室", x: 540, y: 510, w: 140, h: 60, kind: "hall" },
-    { id: "sys-t1c", label: "", name: "中央トイレ", x: 360, y: 510, w: 50, h: 60, kind: "toilet" },
+    { id: "sys-t1c", label: "", name: "中央トイレ", x: 360, y: 510, w: 50, h: 60, kind: "toilet", gender: "both" },
     { id: "sys-s1c", label: "", name: "中央階段", x: 300, y: 510, w: 60, h: 60, kind: "stairs" },
     { id: "sys-yard1", label: "中庭", name: "中庭", x: 410, y: 220, w: 130, h: 350, kind: "corridor" },
-    { id: "sys-t1p", label: "", name: "北トイレ", x: 800, y: 60, w: 70, h: 70, kind: "toilet" },
-    { id: "sys-s1se", label: "2F", name: "東階段 (生徒会室前)", x: 870, y: 60, w: 50, h: 70, kind: "stairs" },
+    { id: "sys-t1p", label: "", name: "北トイレ", x: 800, y: 60, w: 70, h: 70, kind: "toilet", gender: "female" },
+    { id: "sys-s1se", label: "", name: "東階段 (生徒会室前)", x: 870, y: 60, w: 50, h: 70, kind: "stairs" },
     { id: "club-39", label: "生徒会", name: "中学生徒会室", x: 760, y: 260, w: 160, h: 90, kind: "club" },
-    { id: "sys-s1e", label: "", name: "東階段 (2Fへ)", x: 710, y: 400, w: 50, h: 60, kind: "stairs" },
+    { id: "sys-s1e", label: "", name: "東階段", x: 710, y: 400, w: 50, h: 60, kind: "stairs" },
     { id: "sys-e1me", label: "出口", name: "中東出口", x: 760, y: 400, w: 150, h: 60, kind: "hall" },
     { id: "sys-h1vend", label: "", name: "東自販機コーナー", x: 970, y: 400, w: 50, h: 50, kind: "vending" },
     { id: "sys-ev1e", label: "", name: "東EV", x: 960, y: 330, w: 26, h: 35, kind: "elevator" },
     { id: "sys-h1kt", label: "整理券配布", name: "家庭科室", x: 80, y: 600, w: 180, h: 70, kind: "club" },
     { id: "club-29", label: "食堂", name: "食堂", x: 420, y: 700, w: 160, h: 200, kind: "outdoor" },
     { id: "sys-e1out", label: "出口", name: "南出口", x: 520, y: 600, w: 120, h: 60, kind: "hall" },
-    { id: "sys-s1s", label: "2F", name: "南階段 (2Fへ)", x: 650, y: 600, w: 60, h: 60, kind: "stairs" },
-    { id: "club-27", label: "ステージ", name: "ステージ (晴天時)", x: 810, y: 700, w: 160, h: 200, kind: "outdoor" },
+    { id: "sys-s1s", label: "", name: "南階段", x: 650, y: 600, w: 60, h: 60, kind: "stairs" },
+    { id: "sys-stage", label: "ステージ", name: "ステージ (晴天時)", x: 810, y: 700, w: 160, h: 200, kind: "outdoor" },
     { id: "custom-1789345451551", label: "入口", name: "入口", x: 730, y: 530, w: 110, h: 110, kind: "hall" },
     { id: "custom-1789345598723", label: "", name: "渡り廊下", x: 430, y: 600, w: 30, h: 100, kind: "corridor" },
     { id: "custom-1789366324245", label: "", name: "生徒会廊下", x: 710, y: 180, w: 210, h: 30, kind: "corridor" },
     { id: "custom-1789366512885", label: "", name: "生徒会前階段", x: 870, y: 210, w: 50, h: 50, kind: "stairs" },
-    { id: "custom-1789366895764", label: "", name: "新しい部屋", x: 250, y: 510, w: 50, h: 60, kind: "elevator" },
+    { id: "custom-1789366895764", label: "", name: "高校ev", x: 250, y: 510, w: 50, h: 60, kind: "elevator" },
     { id: "custom-1789368013567", label: "", name: "中学階段", x: 910, y: 400, w: 60, h: 60, kind: "stairs" },
-    { id: "custom-1789458959184", label: "", name: "新しい部屋", x: 20, y: 600, w: 50, h: 50, kind: "vending" },
+    { id: "custom-1789458959184", label: "", name: "高校自販機", x: 20, y: 600, w: 50, h: 50, kind: "vending" },
   ],
   "2階": [
     { id: "sys-c2n", label: "", name: "北廊下", x: 220, y: 30, w: 730, h: 30, kind: "corridor" },
     { id: "sys-c2w", label: "", name: "西廊下", x: 220, y: 60, w: 30, h: 510, kind: "corridor" },
     { id: "sys-c2e", label: "", name: "東廊下", x: 920, y: 60, w: 30, h: 320, kind: "corridor" },
     { id: "sys-c2s", label: "", name: "南廊下 (体育館方面)", x: 80, y: 570, w: 420, h: 30, kind: "corridor" },
-    { id: "sys-h2o", label: "大回廊", name: "大回廊 (講堂・食堂方面)", x: 660, y: 690, w: 70, h: 150, kind: "corridor" },
+    { id: "sys-h2o", label: "大回廊", name: "大回廊 (講堂・食堂方面)", x: 610, y: 690, w: 150, h: 170, kind: "corridor" },
     { id: "sys-c2ne", label: "", name: "北東廊下 (北廊下の東延長)", x: 680, y: 350, w: 240, h: 30, kind: "corridor" },
     { id: "sys-c2cn", label: "", name: "中央北廊下 ", x: 680, y: 160, w: 240, h: 30, kind: "corridor" },
     { id: "sys-c2ce", label: "", name: "職員室東廊下", x: 730, y: 380, w: 30, h: 310, kind: "corridor" },
@@ -112,10 +121,10 @@ export const VECTOR_ROOMS: Record<VectorFloor, VectorRoom[]> = {
     { id: "club-24", label: "203", name: "203補助教室", x: 230, y: 600, w: 110, h: 70, kind: "club" },
     { id: "club-18", label: "204", name: "204補助教室", x: 330, y: 600, w: 110, h: 70, kind: "club" },
     { id: "club-21", label: "会議室", name: "高校会議室", x: 440, y: 600, w: 60, h: 70, kind: "club" },
-    { id: "sys-t2n", label: "", name: "北東男子トイレ", x: 800, y: -30, w: 60, h: 60, kind: "toilet" },
-    { id: "sys-t2m", label: "WC", name: "西男子トイレ", x: 255, y: 244, w: 55, h: 76, kind: "toilet" },
+    { id: "sys-t2n", label: "", name: "北東男子トイレ", x: 800, y: -30, w: 60, h: 60, kind: "toilet", gender: "male" },
+    { id: "sys-t2m", label: "", name: "西男子トイレ", x: 255, y: 244, w: 55, h: 76, kind: "toilet", gender: "male" },
     { id: "sys-s2wc", label: "", name: "中央西階段", x: 300, y: 510, w: 70, h: 60, kind: "stairs" },
-    { id: "sys-t2m2", label: "", name: "トイレ", x: 370, y: 510, w: 50, h: 60, kind: "toilet" },
+    { id: "sys-t2m2", label: "", name: "トイレ", x: 370, y: 510, w: 50, h: 60, kind: "toilet", gender: "both" },
     { id: "sys-ev2e", label: "", name: "中学職員室前階段", x: 860, y: 190, w: 60, h: 50, kind: "stairs" },
     { id: "custom-1789265242606", label: "", name: "スタホ前廊下", x: 500, y: 430, w: 30, h: 260, kind: "corridor" },
     { id: "custom-1789265676101", label: "", name: "205廊下", x: 530, y: 660, w: 200, h: 30, kind: "corridor" },
@@ -148,15 +157,15 @@ export const VECTOR_ROOMS: Record<VectorFloor, VectorRoom[]> = {
     { id: "J2B", label: "2B", name: "中学2B", x: 720, y: 370, w: 130, h: 70, kind: "jclass" },
     { id: "J2A", label: "2A", name: "中学2A", x: 720, y: 440, w: 130, h: 70, kind: "jclass" },
     { id: "club-02", label: "工作室", name: "工作室", x: 930, y: 450, w: 80, h: 60, kind: "club" },
-    { id: "club-33", label: "美術室", name: "美術室", x: 1010, y: 400, w: 130, h: 100, kind: "club" },
+    { id: "club-33", label: "美術室", name: "美術室", x: 1010, y: 400, w: 140, h: 100, kind: "club" },
     { id: "sys-s3c", label: "階段", name: "中央階段", x: 300, y: 510, w: 80, h: 60, kind: "stairs" },
     { id: "sys-h3301", label: "整理券配布", name: "301補助教室", x: 470, y: 510, w: 130, h: 60, kind: "club" },
     { id: "2G", label: "2G", name: "高校2G", x: 80, y: 600, w: 130, h: 60, kind: "class" },
     { id: "2H", label: "2H", name: "高校2H", x: 210, y: 600, w: 130, h: 60, kind: "class" },
     { id: "2I", label: "2I", name: "高校2I", x: 340, y: 600, w: 130, h: 60, kind: "class" },
     { id: "2J", label: "2J", name: "高校2J", x: 470, y: 600, w: 130, h: 60, kind: "class" },
-    { id: "sys-t3n", label: "", name: "北東男子トイレ", x: 780, y: -30, w: 80, h: 60, kind: "toilet" },
-    { id: "sys-t3m", label: "WC", name: "西男子トイレ", x: 250, y: 320, w: 80, h: 100, kind: "toilet" },
+    { id: "sys-t3n", label: "", name: "北東男子トイレ", x: 780, y: -30, w: 80, h: 60, kind: "toilet", gender: "male" },
+    { id: "sys-t3m", label: "", name: "西男子トイレ", x: 250, y: 320, w: 80, h: 100, kind: "toilet", gender: "male" },
     { id: "sys-s3n", label: "", name: "北東階段", x: 800, y: 60, w: 50, h: 70, kind: "stairs" },
     { id: "sys-ev3w", label: "", name: "中央EV", x: 250, y: 510, w: 50, h: 60, kind: "elevator" },
     { id: "sys-ev3e", label: "", name: "東EV", x: 880, y: 370, w: 50, h: 50, kind: "elevator" },
@@ -181,8 +190,8 @@ export const VECTOR_ROOMS: Record<VectorFloor, VectorRoom[]> = {
     { id: "club-44", label: "音楽室", name: "高校音楽室", x: 310, y: 300, w: 160, h: 140, kind: "club" },
     { id: "sys-h5b", label: "", name: "5F教室B", x: 310, y: 500, w: 130, h: 90, kind: "hall" },
     { id: "sys-h5d", label: "", name: "5F教室D", x: 310, y: 440, w: 130, h: 60, kind: "hall" },
-    { id: "sys-t45n", label: "", name: "北東男子トイレ", x: 720, y: -30, w: 100, h: 60, kind: "toilet" },
-    { id: "sys-t45s", label: "", name: "5Fトイレ", x: 470, y: 530, w: 50, h: 50, kind: "toilet" },
+    { id: "sys-t45n", label: "", name: "北東男子トイレ", x: 720, y: -30, w: 100, h: 60, kind: "toilet", gender: "male" },
+    { id: "sys-t45s", label: "", name: "5Fトイレ", x: 470, y: 530, w: 50, h: 50, kind: "toilet", gender: "male" },
     { id: "sys-s45n", label: "", name: "北東階段", x: 800, y: 60, w: 50, h: 70, kind: "stairs" },
     { id: "sys-s45w", label: "", name: "西階段 (この階まで・立入禁止)", x: 120, y: 80, w: 100, h: 50, kind: "stairs" },
     { id: "sys-s45e", label: "", name: "中学階段", x: 880, y: 450, w: 50, h: 60, kind: "stairs" },
@@ -216,9 +225,16 @@ export interface VectorAnnotation {
 }
 
 export const VECTOR_ANNOTATIONS: Partial<Record<VectorFloor, VectorAnnotation[]>> = {
-  "1階": [],
-  "2階": [],
-  "3階": [],
+  "1階": [
+    { kind: "badge", text: "1F", x: 160, y: 780 },
+  ],
+  "2階": [
+    { kind: "badge", text: "2F", x: 966, y: 538 },
+    { kind: "label", text: "至 講堂 明照殿 百志館", x: 680, y: 870 },
+  ],
+  "3階": [
+    { kind: "badge", text: "3F", x: 150, y: -50 },
+  ],
   "4階 5階": [
     { kind: "badge", text: "4F", x: 975, y: 125 },
     { kind: "badge", text: "5F", x: 220, y: 320 },
@@ -234,7 +250,34 @@ export const ROOM_FILL: Record<VectorRoom['kind'], string> = {
   stairs: '#FFE3C2', // tertiaryContainer
   elevator: '#FFE3C2', // EVも階段系の淡色 (アイコンで階段と区別)
   vending: '#F8F3EE', // 自販機コーナー (hall系の淡色、アイコンで識別)
-  toilet: '#D3E8F5', // 水回りは淡青 (白廊下・灰背景のどちらとも区別するため)
+  toilet: '#D3E8F5', // 性別未設定のトイレ (gender があれば TOILET_FILL を使う)
   outdoor: '#D9F2D0', // 中庭・屋外 (緑系の淡色、M3外だが図示専用)
   hall: '#F8F3EE', // surfaceContainerLow
 };
+
+/**
+ * トイレ区分ごとの塗り色 (校内マップのアイコン色に対応)。
+ * 男子=青 / 女子=赤。男女 (`both`) は2色で描くため描画側で塗り分ける。
+ */
+export const TOILET_FILL: Record<'male' | 'female', string> = {
+  male: '#2078BF',
+  female: '#D93025',
+};
+
+/** トイレ区分の凡例ラベル。 */
+export const TOILET_GENDER_LABEL: Record<ToiletGender, string> = {
+  male: '男子トイレ',
+  female: '女子トイレ',
+  both: '男女トイレ',
+};
+
+/**
+ * 部屋名からトイレ区分を推定する。
+ * `gender` を持たない既存の管理者上書き (`map-layout.json`) のフォールバック用。
+ */
+export function inferToiletGender(name: string): ToiletGender | undefined {
+  if (/男女|だれでも|誰でも|多目的/.test(name)) return 'both';
+  if (/女子|女性/.test(name)) return 'female';
+  if (/男子|男性/.test(name)) return 'male';
+  return undefined;
+}
