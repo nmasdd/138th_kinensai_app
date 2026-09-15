@@ -372,9 +372,9 @@
   },
   {
     "id": "club-29",
-    "className": "魚初",
-    "projectName": "販売・配布",
-    "description": "去年と同じ",
+    "className": "食堂",
+    "projectName": "講堂1階",
+    "description": "講堂1階の食堂（魚初）です。食券制のため、入口の食券機で食券を購入してください。営業は26日(土)12:00〜14:00、27日(日)11:00〜14:00です。今年は食品の持ち込み・休憩所としての利用はできません。",
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
