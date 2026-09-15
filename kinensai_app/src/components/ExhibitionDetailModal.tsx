@@ -1,7 +1,8 @@
 import React from 'react';
 import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import type { Exhibition } from '../data/exhibitions';
+import { displayClassName, type Exhibition } from '../data/exhibitions';
+import { ticketDistributionRoom } from '../data/mapRoomNotes';
 import { M3Button, M3Divider, M3Icon, M3ImagePlaceholder, M3Touch, m3scrim } from './m3';
 import { FadeOverlay, Pop } from './anim';
 import { m3, scaled } from '../theme';
@@ -9,7 +10,12 @@ import { useM3 } from '../context/responsive';
 
 export function ticketLabel(ex: Exhibition): string {
   if (ex.ticketRequired === 'none') return '整理券: 不要';
-  if (ex.ticketRequired === 'required') return `整理券: 必要${ex.ticketTime ? ` (${ex.ticketTime})` : ''}`;
+  if (ex.ticketRequired === 'required') {
+    const room = ticketDistributionRoom(ex.id);
+    const where = room ? ` ${room}で配布` : '';
+    const time = ex.ticketTime ? ` (${ex.ticketTime})` : '';
+    return `整理券: 必要${where}${time}`;
+  }
   return '整理券: 確認中';
 }
 
@@ -54,7 +60,7 @@ export default function ExhibitionDetailModal({
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               <M3ImagePlaceholder height={140} />
-              <Text style={[type.headlineSmall, { color: m3.onSurface, marginTop: 12 }]}>{exhibition.className}</Text>
+              <Text style={[type.headlineSmall, { color: m3.onSurface, marginTop: 12 }]}>{displayClassName(exhibition.className)}</Text>
               <Text style={[type.titleMedium, { color: m3.onSurface }]}>{exhibition.projectName || '(タイトル未定)'}</Text>
               <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 4 }]}>
                 {exhibition.description || '(説明準備中)'}

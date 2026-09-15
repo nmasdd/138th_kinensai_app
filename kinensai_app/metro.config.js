@@ -16,6 +16,7 @@ const MAP_WRITE_PATH = '/__admin/write-map';
 const FLOORS = ['1階', '2階', '3階', '4階 5階'];
 const KINDS = new Set([
   'class',
+  'jclass',
   'club',
   'corridor',
   'stairs',
@@ -25,7 +26,10 @@ const KINDS = new Set([
   'outdoor',
   'hall',
 ]);
+const ANN_KINDS = new Set(['badge', 'label', 'note']);
 const VECTOR_ROOMS_START = 'export const VECTOR_ROOMS: Record<VectorFloor, VectorRoom[]> = {';
+const VECTOR_ANNOTATIONS_START =
+  'export const VECTOR_ANNOTATIONS: Partial<Record<VectorFloor, VectorAnnotation[]>> = {';
 
 function num(v) {
   return typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 100) / 100 : 0;
@@ -36,10 +40,14 @@ function str(v, fallback = '') {
 }
 
 /** 部屋配列から `VECTOR_ROOMS` の TypeScript リテラルを生成する。 */
-function buildRoomsLiteral(roomsByFloor) {
+function buildRoomsLiteral(roomsByFloor, eol) {
   const lines = [VECTOR_ROOMS_START];
   for (const floor of FLOORS) {
     const rooms = Array.isArray(roomsByFloor[floor]) ? roomsByFloor[floor] : [];
+    if (rooms.length === 0) {
+      lines.push(`  ${JSON.stringify(floor)}: [],`);
+      continue;
+    }
     lines.push(`  ${JSON.stringify(floor)}: [`);
     for (const r of rooms) {
       if (!r || typeof r !== 'object') continue;
@@ -53,7 +61,41 @@ function buildRoomsLiteral(roomsByFloor) {
     lines.push('  ],');
   }
   lines.push('};');
-  return lines.join('\n');
+  return lines.join(eol);
+}
+
+/** 注記配列から `VECTOR_ANNOTATIONS` の TypeScript リテラルを生成する。 */
+function buildAnnotationsLiteral(annByFloor, eol) {
+  const lines = [VECTOR_ANNOTATIONS_START];
+  for (const floor of FLOORS) {
+    const list = Array.isArray(annByFloor[floor]) ? annByFloor[floor] : [];
+    if (list.length === 0) {
+      lines.push(`  ${JSON.stringify(floor)}: [],`);
+      continue;
+    }
+    lines.push(`  ${JSON.stringify(floor)}: [`);
+    for (const a of list) {
+      if (!a || typeof a !== 'object') continue;
+      const text = str(a.text);
+      if (!text) continue;
+      const kind = ANN_KINDS.has(a.kind) ? a.kind : 'label';
+      const tone = a.tone === 'danger' ? ', tone: "danger"' : '';
+      lines.push(
+        `    { kind: ${JSON.stringify(kind)}, text: ${JSON.stringify(text)}, x: ${num(a.x)}, y: ${num(a.y)}${tone} },`,
+      );
+    }
+    lines.push('  ],');
+  }
+  lines.push('};');
+  return lines.join(eol);
+}
+
+/** `START` で始まるブロック (`\n};` まで) を `literal` に置き換える。 */
+function replaceBlock(src, start, literal) {
+  const at = src.indexOf(start);
+  const end = at >= 0 ? src.indexOf('\n};', at) : -1;
+  if (at < 0 || end < 0) throw new Error(`${start.split(' ')[2]} not found in vectorMap.ts`);
+  return `${src.slice(0, at)}${literal}${src.slice(end + 3)}`;
 }
 
 function writeMapRooms(req, res) {
@@ -65,14 +107,22 @@ function writeMapRooms(req, res) {
   req.on('end', () => {
     try {
       const parsed = JSON.parse(body || '{}');
-      const rooms = parsed && typeof parsed === 'object' ? parsed.rooms : null;
-      if (!rooms || typeof rooms !== 'object') throw new Error('rooms is required');
+      const layout = parsed && typeof parsed === 'object' ? parsed.layout : null;
+      if (!layout || typeof layout !== 'object') throw new Error('layout is required');
+      const roomsByFloor = {};
+      const annByFloor = {};
+      for (const floor of FLOORS) {
+        const entry = layout[floor];
+        roomsByFloor[floor] = entry && Array.isArray(entry.rooms) ? entry.rooms : [];
+        annByFloor[floor] = entry && Array.isArray(entry.annotations) ? entry.annotations : [];
+      }
       const filePath = path.join(__dirname, 'src', 'data', 'vectorMap.ts');
       const src = fs.readFileSync(filePath, 'utf8');
-      const start = src.indexOf(VECTOR_ROOMS_START);
-      const end = start >= 0 ? src.indexOf('\n};', start) : -1;
-      if (start < 0 || end < 0) throw new Error('VECTOR_ROOMS not found in vectorMap.ts');
-      const next = `${src.slice(0, start)}${buildRoomsLiteral(rooms)}${src.slice(end + 3)}`;
+      // 既存の改行コードを踏襲する (Windows の CRLF を LF に変えない)
+      const eol = src.includes('\r\n') ? '\r\n' : '\n';
+      let next = src;
+      next = replaceBlock(next, VECTOR_ROOMS_START, buildRoomsLiteral(roomsByFloor, eol));
+      next = replaceBlock(next, VECTOR_ANNOTATIONS_START, buildAnnotationsLiteral(annByFloor, eol));
       fs.writeFileSync(filePath, next, 'utf8');
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ ok: true }));

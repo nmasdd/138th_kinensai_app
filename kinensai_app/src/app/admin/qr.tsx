@@ -8,7 +8,7 @@ import { QrCodeView } from '../../components/QrCodeView';
 import { AdminGate } from '../../components/AdminGuard';
 import { useAdminStyles } from '../../components/adminUi';
 import { VECTOR_FLOORS } from '../../data/vectorMap';
-import { loadMapLayout, type MapLayoutOverrides } from '../../data/mapLayout';
+import { loadMapLayout, annotationsForFloor, roomsForFloor, type MapLayoutOverrides } from '../../data/mapLayout';
 import { buildLocationUrl } from '../../data/locationQr';
 import { m3, scaled } from '../../theme';
 import { useM3 } from '../../context/responsive';
@@ -72,7 +72,8 @@ function AdminQrContent() {
           selectedId={null}
           locId={null}
           selfPos={onThisFloor}
-          roomsOverride={mapLayout[VECTOR_FLOORS[tab]]}
+          roomsOverride={roomsForFloor(VECTOR_FLOORS[tab], mapLayout)}
+          annotationsOverride={annotationsForFloor(VECTOR_FLOORS[tab], mapLayout)}
           onPick={(p) => setPicked({ floorIndex: tab, x: p.x, y: p.y })}
           onSelect={() => {}}
         />

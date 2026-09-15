@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { M3Button, M3Card, M3Divider, M3LoadingView, M3Touch, TopAppBar } from '../../components/m3';
+import { M3Card, M3Divider, M3LoadingView, M3Touch, TopAppBar } from '../../components/m3';
 import { QuickNav } from '../../components/QuickNav';
 import { Rise, Stagger } from '../../components/anim';
 import { useM3 } from '../../context/responsive';
 import { useContentEffect } from '../../context/useContentRefreshKey';
 import { m3, scaled } from '../../theme';
 import { festival } from '../../data/festival';
-import { loadAllExhibitions, type Exhibition } from '../../data/exhibitions';
+import { loadAllExhibitions, displayClassName, type Exhibition } from '../../data/exhibitions';
 import { loadPickIds } from '../../data/picks';
 import { loadAuditorium, findNow, type StageItem } from '../../data/timetable';
 
@@ -59,25 +59,6 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <TopAppBar title="ホーム" />
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <Rise delay={40}>
-          <View style={styles.quickRow}>
-          <M3Button
-            label="オーディエンス投票"
-            icon="how-to-vote"
-            variant="tonal"
-            style={styles.quickButton}
-            onPress={() => router.push('/vote')}
-          />
-          <M3Button
-            label="パンフレット"
-            icon="menu-book"
-            variant="tonal"
-            style={styles.quickButton}
-            onPress={() => router.push('/pamphlet')}
-          />
-          </View>
-        </Rise>
-
         <Rise delay={60}>
           <M3Card variant="outlined">
             <View style={styles.quickNavWrap}>
@@ -105,7 +86,7 @@ export default function HomeScreen() {
 
         <Rise delay={120}>
           <M3Card variant="filled">
-          <Text style={[type.titleMedium, { color: m3.onSurface }]}>おすすめ企画（ランダム{PICK_COUNT}件）</Text>
+          <Text style={[type.titleMedium, { color: m3.onSurface }]}>おすすめ企画</Text>
           {picks.length === 0 && !isLoading ? (
             <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 8 }]}>
               おすすめ企画は準備中です
@@ -119,7 +100,7 @@ export default function HomeScreen() {
               onPress={() => router.push({ pathname: '/search', params: { exhibit: p.id } } as never)}
             >
               <View style={styles.pick}>
-                <Text style={[type.labelLarge, styles.pickBadge]}>{p.className}</Text>
+                <Text style={[type.labelLarge, styles.pickBadge]}>{displayClassName(p.className)}</Text>
                 <Text style={[type.titleSmall, { color: m3.onSurface }]}>
                   {p.projectName || '(タイトル未定)'}
                 </Text>
@@ -153,8 +134,6 @@ function createStyles(s: number) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: m3.surface },
     body: { padding: scaled(16, s), gap: scaled(16, s), paddingBottom: scaled(32, s) },
-    quickRow: { flexDirection: 'row', gap: scaled(12, s) },
-    quickButton: { flex: 1, minWidth: 0 },
     quickNavWrap: { marginTop: 0 },
     pick: { marginTop: scaled(4, s), gap: scaled(6, s), paddingTop: scaled(12, s) },
     pickDivider: { marginTop: scaled(12, s) },

@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { M3Card, M3EmptyState, M3FAB, M3FilterChip, M3Icon, M3ImagePlaceholder, M3LoadingView, M3SearchBar, TopAppBar } from '../../components/m3';
 import { Rise, ScreenFade, Stagger } from '../../components/anim';
 import ExhibitionDetailModal from '../../components/ExhibitionDetailModal';
-import { loadAllExhibitions, type Exhibition } from '../../data/exhibitions';
+import { loadAllExhibitions, displayClassName, type Exhibition } from '../../data/exhibitions';
 import { useFavorites } from '../../data/favorites';
 import { useM3 } from '../../context/responsive';
 import { useContentEffect } from '../../context/useContentRefreshKey';
@@ -177,7 +177,7 @@ export default function SearchScreen() {
               <View style={styles.cardBody}>
                 <View style={styles.cardTitleRow}>
                   <Text style={[type.titleMedium, { color: m3.onSurface, flex: 1 }]} numberOfLines={1}>
-                    {item.className} {item.projectName ? `(${item.projectName})` : '(タイトル)'}
+                    {displayClassName(item.className)} {item.projectName ? `(${item.projectName})` : '(タイトル)'}
                   </Text>
                   {isFavorite(item.id) ? <M3Icon name="star" size={20} color={m3.primary} /> : null}
                 </View>

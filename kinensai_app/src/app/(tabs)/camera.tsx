@@ -39,11 +39,13 @@ export default function CameraScreen() {
   };
 
   const openInMap = () => {
-    if (location) {
-      router.push({ pathname: '/map', params: locationParams(location) } as never);
-      return;
-    }
-    router.push({ pathname: '/map', params: { loc: scanned ?? '' } } as never);
+    if (location) router.push({ pathname: '/map', params: locationParams(location) } as never);
+  };
+
+  const scanAgain = () => {
+    handledRef.current = false;
+    setScanned(null);
+    setActive(true);
   };
 
   return (
@@ -67,7 +69,7 @@ export default function CameraScreen() {
             </View>
           </View>
         </ScreenFade>
-      ) : scanned ? (
+      ) : scanned && location ? (
         <ScreenFade>
           <View style={styles.body}>
             <SuccessCheck size={72}>
@@ -75,30 +77,36 @@ export default function CameraScreen() {
             </SuccessCheck>
             <M3Card variant="elevated" style={styles.resultCard}>
               <Text style={[type.titleMedium, { color: m3.onSurface }]} accessibilityLiveRegion="polite">
-                {location ? '現在地のQRコードを読み取りました' : 'QRを読み取りました'}
+                現在地のQRコードを読み取りました
               </Text>
-              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 8 }]} numberOfLines={3}>
-                {location ? 'マップで現在地を確認できます。' : scanned}
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 8 }]}>
+                マップで現在地を確認できます。
               </Text>
             </M3Card>
             <View style={styles.resultActions}>
               <ConfirmPop key={scanned}>
-                <M3Button
-                  label={location ? 'マップで現在地を見る' : 'マップで関連企画を見る'}
-                  icon="map"
-                  onPress={openInMap}
-                />
+                <M3Button label="マップで現在地を見る" icon="map" onPress={openInMap} />
               </ConfirmPop>
-              <M3Button
-                label="もう一度読み取る"
-                icon="qr-code-2"
-                variant="tonal"
-                onPress={() => {
-                  handledRef.current = false;
-                  setScanned(null);
-                  setActive(true);
-                }}
-              />
+              <M3Button label="もう一度読み取る" icon="qr-code-2" variant="tonal" onPress={scanAgain} />
+            </View>
+          </View>
+        </ScreenFade>
+      ) : scanned ? (
+        <ScreenFade>
+          <View style={styles.body}>
+            <M3EmptyState icon="error-outline">
+              <Text
+                style={[type.titleMedium, { color: m3.onSurface, textAlign: 'center' }]}
+                accessibilityLiveRegion="polite"
+              >
+                正しいQRコードを読んで下さい
+              </Text>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
+                廊下に貼られた現在地QRコードを読み取ってください。
+              </Text>
+            </M3EmptyState>
+            <View style={styles.resultActions}>
+              <M3Button label="もう一度読み取る" icon="qr-code-2" onPress={scanAgain} />
             </View>
           </View>
         </ScreenFade>

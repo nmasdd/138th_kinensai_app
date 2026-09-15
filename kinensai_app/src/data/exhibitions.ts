@@ -23,6 +23,17 @@ export interface Exhibition {
 
 const CATALOG = CLASS_CATALOG;
 
+/**
+ * 表示用のクラス名。高校教室 (1A〜3J) は「高校」を付ける。
+ * 中学は同梱カタログの className が「中学3A」のためそのまま表示する。
+ */
+export function displayClassName(className: string): string {
+  const name = className.trim();
+  // 全角 (２D 等) も高校教室として扱うため NFKC 正規化して判定する
+  const half = name.normalize('NFKC');
+  return /^[123][A-J]$/.test(half) ? `高校${name}` : className;
+}
+
 /** クラス企画の管理者上書き (タイトル・説明・場所・画像)。同梱カタログより優先される */
 export interface ClassOverride {
   title?: string;

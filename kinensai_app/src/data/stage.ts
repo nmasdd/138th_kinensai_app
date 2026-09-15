@@ -72,6 +72,13 @@ const VOTES_FILE = `${FileSystem.documentDirectory}stage-votes.json`;
 const GROUPS_KEY = 'stage-groups.json';
 const AUDITORIUM_GROUPS_KEY = 'auditorium-groups.json';
 
+/**
+ * オーディエンス投票を受け付けるか。
+ * 現在は受付を停止している (vote.tsx で「現在は投票できません」を表示し操作を無効化)。
+ * 再開するときは true に戻す。
+ */
+export const VOTING_ENABLED = false;
+
 async function loadGroupsOf(key: string, fallback: StageGroup[]): Promise<StageGroup[]> {
   const parsed = await loadJSON<unknown>(key, null);
   if (Array.isArray(parsed)) return parsed as StageGroup[];

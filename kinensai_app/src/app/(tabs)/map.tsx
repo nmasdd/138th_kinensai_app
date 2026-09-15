@@ -11,7 +11,8 @@ import { loadAllExhibitions, type Exhibition } from '../../data/exhibitions';
 import { useFavorites } from '../../data/favorites';
 import { hotspotForExhibitionId } from '../../data/mapHotspots';
 import { VECTOR_FLOORS, type VectorFloor } from '../../data/vectorMap';
-import { loadMapLayout, type MapLayoutOverrides } from '../../data/mapLayout';
+import { loadMapLayout, annotationsForFloor, roomsForFloor, type MapLayoutOverrides } from '../../data/mapLayout';
+import { roomNoteForId } from '../../data/mapRoomNotes';
 import { useM3 } from '../../context/responsive';
 import { m3, scaled, type M3Shape } from '../../theme';
 
@@ -170,6 +171,22 @@ export default function MapScreen() {
 
   const floor = FLOOR_LABELS[tab];
 
+  // 選択中の部屋 (企画IDに紐づかない施設。中庭・整理券配布教室など)
+  const selectedRoom = useMemo(() => {
+    if (!selectedId || selected) return null;
+    const rooms = roomsForFloor(floor, mapLayout);
+    return rooms.find((r) => r.id === selectedId) ?? null;
+  }, [selectedId, selected, floor, mapLayout]);
+  const selectedRoomNote = selectedRoom ? roomNoteForId(selectedRoom.id) : null;
+
+  // その部屋を会場にする企画 (施設名が place に含まれるもの)
+  const roomExhibitions = useMemo(() => {
+    if (!selectedRoom || selectedRoomNote) return [] as Exhibition[];
+    const names = [selectedRoom.name, selectedRoom.label].filter((n) => !!n && n.length >= 2);
+    if (names.length === 0) return [] as Exhibition[];
+    return exhibitions.filter((ex) => names.some((n) => (ex.place ?? '').includes(n)));
+  }, [selectedRoom, selectedRoomNote, exhibitions]);
+
   const selectPlace = useCallback(
     (ex: Exhibition) => {
       setSelectedId(ex.id);
@@ -213,7 +230,8 @@ export default function MapScreen() {
             selectedId={selectedId}
             locId={locExhibition?.id ?? locText}
             selfPos={selfRel && (floorIndexFromParam < 0 || floorIndexFromParam === tab) ? selfRel : null}
-            roomsOverride={mapLayout[floor]}
+            roomsOverride={roomsForFloor(floor, mapLayout)}
+            annotationsOverride={annotationsForFloor(floor, mapLayout)}
             onSelect={selectHotspot}
           />
         </ScreenFade>
@@ -256,6 +274,34 @@ export default function MapScreen() {
               <M3Touch onPress={() => setModalVisible(true)} label="詳細を開く" round>
                 <Text style={[type.labelLarge, styles.detailLink]}>詳細を見る</Text>
               </M3Touch>
+            </>
+          ) : selectedRoom && selectedRoomNote ? (
+            <>
+              <Text style={[type.titleMedium, { color: m3.onSurface }]}>
+                {selectedRoom.label || selectedRoom.name}
+              </Text>
+              {selectedRoom.label && selectedRoom.label !== selectedRoom.name ? (
+                <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 4 }]}>
+                  {selectedRoom.name}
+                </Text>
+              ) : null}
+              <Text style={[type.bodyMedium, { color: m3.onSurface, marginTop: 8 }]}>
+                {selectedRoomNote}
+              </Text>
+            </>
+          ) : selectedRoom && roomExhibitions.length > 0 ? (
+            <>
+              <Text style={[type.titleMedium, { color: m3.onSurface }]}>{selectedRoom.name}</Text>
+              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant, marginTop: 4 }]}>
+                この場所で行われる企画
+              </Text>
+              {roomExhibitions.map((ex) => (
+                <M3Touch key={ex.id} onPress={() => setSelectedId(ex.id)} label={`${ex.className}の詳細を表示`} round>
+                  <Text style={[type.labelLarge, styles.detailLink]} numberOfLines={1}>
+                    {ex.className} {ex.projectName || '(タイトル未定)'}
+                  </Text>
+                </M3Touch>
+              ))}
             </>
           ) : (
             <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>一覧から場所を選ぶとここに詳細を表示します。</Text>

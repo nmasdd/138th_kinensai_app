@@ -3,7 +3,7 @@ import { PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react
 import { M3Icon } from './m3';
 import { m3, scaled, type M3Shape } from '../theme';
 import { useM3 } from '../context/responsive';
-import { ROOM_FILL, VECTOR_ROOMS, type VectorFloor, type VectorRoom } from '../data/vectorMap';
+import { ROOM_FILL, VECTOR_ANNOTATIONS, VECTOR_ROOMS, type VectorAnnotation, type VectorFloor, type VectorRoom } from '../data/vectorMap';
 import { hotspotForExhibitionId } from '../data/mapHotspots';
 
 const WORLD_W = 1000;
@@ -19,6 +19,12 @@ interface Props {
   selfPos?: { x: number; y: number } | null;
   /** 管理者が編集した部屋配置。未指定なら同梱の VECTOR_ROOMS を使う */
   roomsOverride?: VectorRoom[] | null;
+  /** 管理者が編集した注記。未指定なら同梱の VECTOR_ANNOTATIONS を使う */
+  annotationsOverride?: VectorAnnotation[] | null;
+  /** 選択中の注記 index (管理者の配置編集でハイライトする) */
+  selectedAnnotation?: number | null;
+  /** 指定すると注記タップで index を返す (管理者の配置編集用) */
+  onSelectAnnotation?: (index: number) => void;
   /** 指定すると地図タップで絶対位置 (0〜1 の相対座標) を返す作成モードになる */
   onPick?: (p: { x: number; y: number }) => void;
   /** onPick の座標を 0〜1 にクランプしない (管理者の枠外配置編集用) */
@@ -98,7 +104,7 @@ function VendingMachineIcon({ size, color }: { size: number; color: string }) {
  * 画像埋め込みなし。ドラッグでパン、ピンチ/ホイール/ダブルタップ/ボタンでズーム。
  * 部屋は vectorMap.ts の模式図、展示マーカーは mapHotspots.ts と展示IDで対応。
  */
-export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride, onPick, pickUnclamped, roomsTappable, onSelect }: Props) {
+export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride, annotationsOverride, selectedAnnotation, onSelectAnnotation, onPick, pickUnclamped, roomsTappable, onSelect }: Props) {
   const { type, scale: uiScale } = useM3();
   const styles = useStyles();
   const [fit, setFit] = useState(FIT_FALLBACK);
@@ -125,6 +131,12 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
   }, [pickUnclamped]);
 
   const rooms = useMemo(() => roomsOverride ?? VECTOR_ROOMS[floor] ?? [], [roomsOverride, floor]);
+
+  // 部屋とは独立した注記 (階バッジ・「この階まで」・立入禁止など)
+  const annotations = useMemo(
+    () => annotationsOverride ?? VECTOR_ANNOTATIONS[floor] ?? [],
+    [annotationsOverride, floor],
+  );
 
   // 部屋の外接矩形 (世界 0..WORLD_W / 0..WORLD_H を必ず含む)。
   // 枠外に置かれた部屋にも fit とパン範囲を追従させる。
@@ -442,6 +454,9 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
   const labelFontSize = useMemo(() => clamp(15 / scale, 5, 44), [scale]);
   const sysIconSize = useMemo(() => clamp(20 / scale, 8, 52), [scale]);
   const locIconSize = useMemo(() => clamp(18 / scale, 8, 44), [scale]);
+  // 注記の文字・バッジも 1/scale で画面サイズを一定に保つ
+  const annFontSize = useMemo(() => clamp(13 / scale, 5, 40), [scale]);
+  const annBadgeSize = useMemo(() => clamp(50 / scale, 20, 130), [scale]);
   // グリッド線は 1/scale で太さを打ち消し、拡大しても画面上で細い線を保つ
   const gridLine = useMemo(() => clamp(1 / scale, 0.001, 6), [scale]);
 
@@ -500,7 +515,7 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
           const active = isActiveRoom(r);
           const isLoc = isLocRoom(r);
           const tappable =
-            (roomsTappable ?? onPick == null) && (r.kind === 'class' || r.kind === 'club' || r.kind === 'outdoor');
+            (roomsTappable ?? onPick == null) && (r.kind === 'class' || r.kind === 'jclass' || r.kind === 'club' || r.kind === 'outdoor');
           const body = (
             <View
               style={[
@@ -561,6 +576,70 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
               accessibilityState={{ selected: active }}
             >
               {body}
+            </Pressable>
+          );
+        })}
+        {annotations.map((a, i) => {
+          const isBadge = a.kind === 'badge';
+          const danger = a.tone === 'danger';
+          const active = selectedAnnotation === i;
+          const boxStyle = isBadge
+            ? {
+                left: a.x - annBadgeSize / 2,
+                top: a.y - annBadgeSize / 2,
+                width: annBadgeSize,
+                height: annBadgeSize,
+                borderRadius: annBadgeSize / 2,
+              }
+            : {
+                left: a.x - (a.kind === 'note' ? 450 : 160),
+                top: a.y,
+                width: a.kind === 'note' ? 900 : 320,
+              };
+          const content = isBadge ? (
+            <Text
+              style={{ color: m3.inverseOnSurface, fontSize: annFontSize * 1.35, fontWeight: '700' }}
+              allowFontScaling={false}
+            >
+              {a.text}
+            </Text>
+          ) : (
+            <Text
+              style={{
+                color: danger ? m3.error : m3.onSurfaceVariant,
+                fontSize: a.kind === 'note' ? annFontSize * 0.92 : annFontSize,
+                fontWeight: danger ? '700' : '600',
+                lineHeight: annFontSize * 1.25,
+                textAlign: 'center',
+              }}
+              allowFontScaling={false}
+            >
+              {a.text}
+            </Text>
+          );
+          const style = [
+            isBadge ? styles.annBadge : styles.annTextWrap,
+            boxStyle,
+            active ? styles.annActive : null,
+          ];
+          if (!onSelectAnnotation) {
+            return (
+              <View key={`ann-${i}`} pointerEvents="none" accessible={false} style={style}>
+                {content}
+              </View>
+            );
+          }
+          return (
+            <Pressable
+              key={`ann-${i}`}
+              onPress={() => onSelectAnnotation(i)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={`注記「${a.text}」を選択`}
+              accessibilityState={{ selected: active }}
+              style={style}
+            >
+              {content}
             </Pressable>
           );
         })}
@@ -637,7 +716,9 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
       </View>
       <View style={styles.legend}>
         <View style={[styles.legendSwatch, { backgroundColor: ROOM_FILL.class }]} />
-        <Text style={[type.labelMedium, styles.metaText]}>教室</Text>
+        <Text style={[type.labelMedium, styles.metaText]}>高校教室</Text>
+        <View style={[styles.legendSwatch, { backgroundColor: ROOM_FILL.jclass }]} />
+        <Text style={[type.labelMedium, styles.metaText]}>中学教室</Text>
         <View style={[styles.legendSwatch, { backgroundColor: ROOM_FILL.club }]} />
         <Text style={[type.labelMedium, styles.metaText]}>特別教室</Text>
         <View style={[styles.legendSwatch, { backgroundColor: ROOM_FILL.outdoor }]} />
@@ -726,6 +807,14 @@ function createStyles(s: number, shape: M3Shape) {
       borderWidth: 1,
       borderColor: m3.outlineVariant,
     },
+    annBadge: {
+      position: 'absolute',
+      backgroundColor: m3.inverseSurface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    annTextWrap: { position: 'absolute', alignItems: 'center' },
+    annActive: { borderWidth: 3, borderColor: m3.primary, borderStyle: 'dashed' },
   });
 }
 

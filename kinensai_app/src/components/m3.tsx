@@ -40,6 +40,7 @@ export function M3Touch({
   round = false,
   label,
   role = 'button',
+  disabled = false,
 }: {
   children: React.ReactNode;
   onPress?: () => void;
@@ -47,6 +48,7 @@ export function M3Touch({
   round?: boolean;
   label?: string;
   role?: AccessibilityRole;
+  disabled?: boolean;
 }) {
   const styles = useStyles();
   const reduced = useReducedMotion();
@@ -55,11 +57,11 @@ export function M3Touch({
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   const pressIn = () => {
-    if (reduced) return;
+    if (reduced || disabled) return;
     scale.set(withSpring(PRESS_SCALE, { damping: 20, stiffness: 400, mass: 0.5 }));
   };
   const pressOut = () => {
-    if (reduced) return;
+    if (reduced || disabled) return;
     scale.set(withSpring(1, { damping: 16, stiffness: 300, mass: 0.6 }));
   };
 
@@ -67,8 +69,10 @@ export function M3Touch({
     <Pressable
       accessibilityLabel={label}
       accessibilityRole={role}
-      android_ripple={{ color: 'rgba(0,0,0,0.12)', borderless: false }}
-      onPress={onPress}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      android_ripple={disabled ? undefined : { color: 'rgba(0,0,0,0.12)', borderless: false }}
+      onPress={disabled ? undefined : onPress}
       onPressIn={pressIn}
       onPressOut={pressOut}
       style={[round && styles.roundClip, style]}
@@ -283,22 +287,21 @@ export function M3IconButton({
   onPress,
   label,
   selected = false,
+  disabled = false,
 }: {
   icon: IconName;
   onPress?: () => void;
   label?: string;
   selected?: boolean;
+  disabled?: boolean;
 }) {
   const styles = useStyles();
+  const bg = disabled ? m3.surfaceContainerHighest : selected ? m3.primaryContainer : m3.secondaryContainer;
+  const fg = disabled ? m3.onSurfaceVariant : selected ? m3.onPrimaryContainer : m3.onSecondaryContainer;
   return (
-    <M3Touch onPress={onPress} label={label} round>
-      <View
-        style={[
-          styles.tonalIcon,
-          { backgroundColor: selected ? m3.primaryContainer : m3.secondaryContainer },
-        ]}
-      >
-        <M3Icon name={icon} color={selected ? m3.onPrimaryContainer : m3.onSecondaryContainer} />
+    <M3Touch onPress={onPress} label={label} round disabled={disabled}>
+      <View style={[styles.tonalIcon, { backgroundColor: bg }]}>
+        <M3Icon name={icon} color={fg} />
       </View>
     </M3Touch>
   );
