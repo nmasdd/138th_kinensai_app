@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 /**
@@ -35,11 +36,15 @@ const POLL_INTERVAL_MS = 15 * 1000;
 const FETCH_TIMEOUT_MS = 8000;
 
 /**
- * 既定の配信ベースURL。Expo Web の静的exportでは
- * `Constants.expoConfig.extra` がバンドルに埋め込まれないため、
- * コード側の既定値を持つ (app.json の同名設定があればそちらを優先)。
+ * 既定の配信ベースURL。
+ * - Web: 同一オリジンの相対パス。静的exportは配信元のWorkerが `/api/content` を
+ *   提供するため、workers.dev でもカスタムドメインでも同じ設定で動作する
+ *   (相対パスはSSRとクライアントで同一になり、hydrationずれも起きない)。
+ * - ネイティブ: 同一オリジンが無いため本番URLを既定に持つ
+ *   (app.json `extra.contentUrl` があればそちらを優先)。
  */
-const DEFAULT_CONTENT_URL = 'https://app.kinensai.jp/api/content';
+const DEFAULT_CONTENT_URL =
+  Platform.OS === 'web' ? '/api/content' : 'https://app.kinensai.jp/api/content';
 
 /** 環境変数を安全に読む (未定義の process.env でも落ちない)。 */
 function envValue(name: string): string {

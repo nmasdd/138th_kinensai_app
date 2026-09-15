@@ -3,6 +3,8 @@ import {
   VECTOR_ANNOTATIONS,
   VECTOR_FLOORS,
   VECTOR_ROOMS,
+  inferToiletGender,
+  type ToiletGender,
   type VectorAnnotation,
   type VectorFloor,
   type VectorRoom,
@@ -42,8 +44,34 @@ const KINDS: VectorRoom['kind'][] = [
 
 const ANN_KINDS: VectorAnnotation['kind'][] = ['badge', 'label', 'note'];
 
+const GENDERS: ToiletGender[] = ['male', 'female', 'both'];
+
 function num(v: unknown, fallback: number): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+}
+
+/** 同梱の同IDの部屋が持つトイレ区分 (上書きに gender が無い場合の第一候補)。 */
+function bundledGender(id: string): ToiletGender | undefined {
+  for (const f of VECTOR_FLOORS) {
+    const hit = (VECTOR_ROOMS[f] ?? []).find((r) => r.id === id);
+    if (hit?.gender) return hit.gender;
+  }
+  return undefined;
+}
+
+/**
+ * 保存済み上書きのトイレ区分を解決する。
+ * 明示値 → 同梱の同ID → 部屋名からの推定 の順にフォールバックする。
+ */
+function sanitizeGender(
+  v: unknown,
+  id: string,
+  name: string,
+  kind: VectorRoom['kind'],
+): ToiletGender | undefined {
+  if (kind !== 'toilet') return undefined;
+  if (typeof v === 'string' && (GENDERS as string[]).includes(v)) return v as ToiletGender;
+  return bundledGender(id) ?? inferToiletGender(name);
 }
 
 function sanitizeRoom(v: unknown): VectorRoom | null {
@@ -53,15 +81,18 @@ function sanitizeRoom(v: unknown): VectorRoom | null {
   const kind = typeof r.kind === 'string' && (KINDS as string[]).includes(r.kind)
     ? (r.kind as VectorRoom['kind'])
     : 'hall';
+  const name = typeof r.name === 'string' && r.name ? r.name : r.id;
+  const gender = sanitizeGender(r.gender, r.id, name, kind);
   return {
     id: r.id,
     label: typeof r.label === 'string' ? r.label : '',
-    name: typeof r.name === 'string' && r.name ? r.name : r.id,
+    name,
     x: num(r.x, 0),
     y: num(r.y, 0),
     w: num(r.w, 60),
     h: num(r.h, 60),
     kind,
+    ...(gender ? { gender } : {}),
   };
 }
 

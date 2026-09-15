@@ -27,6 +27,7 @@ const KINDS = new Set([
   'hall',
 ]);
 const ANN_KINDS = new Set(['badge', 'label', 'note']);
+const GENDERS = new Set(['male', 'female', 'both']);
 const VECTOR_ROOMS_START = 'export const VECTOR_ROOMS: Record<VectorFloor, VectorRoom[]> = {';
 const VECTOR_ANNOTATIONS_START =
   'export const VECTOR_ANNOTATIONS: Partial<Record<VectorFloor, VectorAnnotation[]>> = {';
@@ -54,8 +55,10 @@ function buildRoomsLiteral(roomsByFloor, eol) {
       const id = str(r.id);
       if (!id) continue;
       const kind = KINDS.has(r.kind) ? r.kind : 'hall';
+      // トイレは校内マップ由来の性別 (色分け) を保持する
+      const gender = kind === 'toilet' && GENDERS.has(r.gender) ? `, gender: ${JSON.stringify(r.gender)}` : '';
       lines.push(
-        `    { id: ${JSON.stringify(id)}, label: ${JSON.stringify(str(r.label))}, name: ${JSON.stringify(str(r.name, id))}, x: ${num(r.x)}, y: ${num(r.y)}, w: ${num(r.w)}, h: ${num(r.h)}, kind: ${JSON.stringify(kind)} },`,
+        `    { id: ${JSON.stringify(id)}, label: ${JSON.stringify(str(r.label))}, name: ${JSON.stringify(str(r.name, id))}, x: ${num(r.x)}, y: ${num(r.y)}, w: ${num(r.w)}, h: ${num(r.h)}, kind: ${JSON.stringify(kind)}${gender} },`,
       );
     }
     lines.push('  ],');

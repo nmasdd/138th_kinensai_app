@@ -1,4 +1,4 @@
-name = "kinensai-app"
+name = "138-kinensai-app"
 compatibility_date = "2026-09-10"
 main = "./worker/src/index.ts"
 
@@ -13,7 +13,8 @@ not_found_handling = "single-page-application"
 binding = "CONTENT"
 id = "56b863becb354e94b05affe288ce9ffb"
 
-# カスタムドメイン https://app.kinensai.jp/
-[[routes]]
-pattern = "app.kinensai.jp"
-custom_domain = true
+# カスタムドメインは現在未設定 (workers.dev: https://138-kinensai-app.k134-qrapp.workers.dev)。
+# 付与する場合は以下を有効化する。
+# [[routes]]
+# pattern = "app.kinensai.jp"
+# custom_domain = true

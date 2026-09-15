@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 /**
  * 校内QRコードの現在地表現。
  *
@@ -7,8 +9,16 @@
  * 現在地を表示できる。
  */
 
-/** QR に書き込む URL の基点 (本番公開ドメイン)。 */
-export const LOCATION_BASE_URL = 'https://app.kinensai.jp';
+/**
+ * QR に書き込む URL の基点。
+ * Web は配信中のオリジン (workers.dev でもカスタムドメインでも同じ)、
+ * ネイティブは同一オリジンが無いため本番公開ドメインを使う。
+ */
+export function getLocationBaseUrl(): string {
+  if (Platform.OS !== 'web') return 'https://app.kinensai.jp';
+  if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
+  return '';
+}
 
 /** フロア index (0〜3) に対応する階トークン。4 は「4階 5階」。 */
 export const FLOOR_TOKENS = ['1', '2', '3', '4'] as const;
@@ -34,7 +44,7 @@ export function buildLocationPath(floorIndex: number, x: number, y: number): str
 
 /** QR に符号化する絶対 URL を組み立てる。 */
 export function buildLocationUrl(floorIndex: number, x: number, y: number): string {
-  return `${LOCATION_BASE_URL}${buildLocationPath(floorIndex, x, y)}`;
+  return `${getLocationBaseUrl()}${buildLocationPath(floorIndex, x, y)}`;
 }
 
 export interface ParsedLocation {

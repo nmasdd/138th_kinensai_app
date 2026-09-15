@@ -44,15 +44,15 @@
 - `opencode.json` は **git 管理外** (`.gitignore` に登録済み)。PCごとに環境が異なるローカルのエージェント／MCP 設定のため、ステージ・コミットしない (`git add` しても入らない)。
 
 ## Cloudflare 公開 (https://app.kinensai.jp/)
-- Worker名 `kinensai-app` (zone `kinensai.jp`、カスタムドメイン `app.kinensai.jp`)。`138th-kinensai` (本体サイト) には触らない。
-- 構成 (`kinensai_app/` 配下): `wrangler.toml` (assets `./dist` + `not_found_handling=single-page-application` + routes custom_domain) と `worker/src/index.ts` (main、ASSETSバインディング)。`worker/` も `tsc --noEmit` の検査対象 (DOM libで型検査)。
+- Worker名 `138-kinensai-app` (zone `kinensai.jp`)。カスタムドメインは未設定 (workers.dev: https://138-kinensai-app.k134-qrapp.workers.dev)。`138th-kinensai` (本体サイト) には触らない。
+- 構成 (`kinensai_app/` 配下): `wrangler.toml` (assets `./dist` + `not_found_handling=single-page-application`、routes 未設定) と `worker/src/index.ts` (main、ASSETSバインディング)。`worker/` も `tsc --noEmit` の検査対象 (DOM libで型検査)。
 - デプロイ手順 (`kinensai_app/` で、要 `npx wrangler login`):
   ```
   npx expo export --platform web
   npx wrangler deploy
   ```
   `dist/` は gitignore だがデプロイ入力のため export で再生成すること。`--dry-run` で事前検証可。
-- 管理者認証はサーバ側: `POST /api/admin/login` (検証→署名付きトークン発行・12時間有効) と `POST /api/admin/verify`。秘密はWorkerシークレット `ADMIN_PASSWORD` / `ADMIN_SESSION_SECRET` のみ (API `PUT /accounts/{id}/workers/scripts/kinensai-app/secrets` か `wrangler secret put` で設定)。パスワード・トークンをコード/バンドル/一時ファイル/チャット出力に残さない。`AdminGate` はトークンをメモリ (+WebはsessionStorage) に保持。
+- 管理者認証はサーバ側: `POST /api/admin/login` (検証→署名付きトークン発行・12時間有効) と `POST /api/admin/verify`。秘密はWorkerシークレット `ADMIN_PASSWORD` / `ADMIN_SESSION_SECRET` のみ (API `PUT /accounts/{id}/workers/scripts/138-kinensai-app/secrets` か `wrangler secret put` で設定)。パスワード・トークンをコード/バンドル/一時ファイル/チャット出力に残さない。`AdminGate` はトークンをメモリ (+WebはsessionStorage) に保持。
 - 全世界配信: KV名前空間 `kinensai-content` (binding `CONTENT`) + `GET /api/content/<name>.json` (公開・`max-age=15, stale-while-revalidate=15`) + `GET /api/content/_meta.json` (版数) + `POST /api/content/publish` (管理者トークン必須・12キーのホワイトリスト検証)。クライアントは `app.json extra.contentUrl=https://app.kinensai.jp/api/content` から取得。読込優先度は端末プレビュー→全世界配信→同梱値 (`kvStore.ts`)。反映は30秒以内を目標 (`remoteConfig.ts` が `_meta.json` の版数を起動時/復帰時/15秒毎に確認し、`?v=<version>` 付きで再取得 + `useContentEffect` で画面再読込)。`/admin/data` の「全世界に公開」が現在有効値を一括公開し `_meta.json` の版数も更新、「プレビュー破棄」が端末編集の取消。公開バンドル書き出しはバックアップ・確認用。
 - 画像配信 (R2なし・KV代替): `POST /api/images/upload` (管理者トークン必須・jpg/png/webp/gif・5MB以下・KV格納+ランダムキー発行) + `GET /api/images/<key>` (公開・edgeキャッシュ+1年immutable)。管理者の `imageUri` は端末ローカル (`file://`・`blob:`) やdataURLのため、公開時に `imageUpload.ts` の `rewriteImagesForPublish` が自動で上げてhttps URLに書換える (http(s)は維持・失敗分は元のまま+件数報告)。HEICは非対応 (JPG/PNG等で登録)。
 - 落とし穴: ローカル `expo start --web` では `/api/admin/*` がないため管理者ログイン不可 (Webは同一オリジン相対、ネイティブは本番URL直指し)。自宅LANのDNSが古いと `app.kinensai.jp` が引けないことがある (Google DNS `https://dns.google/resolve?name=app.kinensai.jp&type=A` で切分け)。bash実行は `cmd /c` 経由 (`&&` 不可、`A && B` は `A; if ($?) { B }`)。

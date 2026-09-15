@@ -11,6 +11,8 @@ import {
   VECTOR_ANNOTATIONS,
   VECTOR_FLOORS,
   VECTOR_ROOMS,
+  inferToiletGender,
+  type ToiletGender,
   type VectorAnnotation,
   type VectorFloor,
   type VectorRoom,
@@ -47,6 +49,12 @@ const KIND_OPTIONS: { value: VectorRoom['kind']; label: string }[] = [
   { value: 'toilet', label: 'トイレ' },
   { value: 'outdoor', label: '屋外' },
   { value: 'hall', label: 'その他' },
+];
+
+const GENDER_OPTIONS: { value: ToiletGender; label: string }[] = [
+  { value: 'male', label: '男子 (青)' },
+  { value: 'female', label: '女子 (赤)' },
+  { value: 'both', label: '男女 (2色)' },
 ];
 
 const ANN_KIND_OPTIONS: { value: VectorAnnotation['kind']; label: string }[] = [
@@ -381,6 +389,15 @@ function AdminMapContent() {
                   onChange={(k) => patchRoom({ kind: k })}
                 />
               </Field>
+              {selectedRoom.kind === 'toilet' ? (
+                <Field label="トイレ区分 (校内マップの色分け)">
+                  <Chips
+                    options={GENDER_OPTIONS}
+                    value={selectedRoom.gender ?? inferToiletGender(selectedRoom.name) ?? 'male'}
+                    onChange={(g) => patchRoom({ gender: g })}
+                  />
+                </Field>
+              ) : null}
               <Field label="座標・サイズ (1000×700 のマス目)">
                 <View style={styles.numGrid}>
                   <NumField label="X" value={selectedRoom.x} onChange={(n) => patchRoom({ x: n })} />

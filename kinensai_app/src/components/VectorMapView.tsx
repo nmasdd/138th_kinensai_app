@@ -3,13 +3,25 @@ import { PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react
 import { M3Icon } from './m3';
 import { m3, scaled, type M3Shape } from '../theme';
 import { useM3 } from '../context/responsive';
-import { ROOM_FILL, VECTOR_ANNOTATIONS, VECTOR_ROOMS, type VectorAnnotation, type VectorFloor, type VectorRoom } from '../data/vectorMap';
+import { ROOM_FILL, TOILET_FILL, TOILET_GENDER_LABEL, VECTOR_ANNOTATIONS, VECTOR_ROOMS, inferToiletGender, type VectorAnnotation, type VectorFloor, type VectorRoom } from '../data/vectorMap';
 import { hotspotForExhibitionId } from '../data/mapHotspots';
 
 const WORLD_W = 1000;
 const WORLD_H = 700;
 const MAX_SCALE = 4;
 const FIT_FALLBACK = Math.min(380 / WORLD_W, 380 / WORLD_H);
+
+/**
+ * 背景の格子。ワールド矩形 (1000×700) だけだと、はみ出した部屋がある階で
+ * 途中で切れるため、パン・ズームで見える範囲を十分に覆う固定範囲へ敷く。
+ */
+const GRID_LEFT = -600;
+const GRID_TOP = -600;
+const GRID_STEP = 100;
+const GRID_W = 2400;
+const GRID_H = 2100;
+const GRID_V_COUNT = GRID_W / GRID_STEP + 1;
+const GRID_H_COUNT = GRID_H / GRID_STEP + 1;
 
 interface Props {
   floor: VectorFloor;
@@ -257,9 +269,9 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
     apply(s1, tx1, ty1);
   };
 
-  // フロア切替時は全体表示にリセット
+  // フロア切替時は全体表示 (その階の内容中心) にリセット
   useEffect(() => {
-    apply(fitRef.current, 0, 0);
+    applyContentFit(fitRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [floor]);
 
@@ -502,11 +514,11 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
         style={[styles.world, { width: WORLD_W, height: WORLD_H, transform: [{ translateX: tx }, { translateY: ty }, { scale }] }]}
       >
         <View style={styles.grid} pointerEvents="none">
-          {Array.from({ length: 11 }).map((_, i) => (
-            <View key={`v${i}`} style={[styles.gridV, { left: `${(i + 1) * 8.33}%`, width: gridLine }]} />
+          {Array.from({ length: GRID_V_COUNT }).map((_, i) => (
+            <View key={`v${i}`} style={[styles.gridV, { left: i * GRID_STEP, width: gridLine }]} />
           ))}
-          {Array.from({ length: 7 }).map((_, i) => (
-            <View key={`h${i}`} style={[styles.gridH, { top: `${(i + 1) * 12.5}%`, height: gridLine }]} />
+          {Array.from({ length: GRID_H_COUNT }).map((_, i) => (
+            <View key={`h${i}`} style={[styles.gridH, { top: i * GRID_STEP, height: gridLine }]} />
           ))}
         </View>
         {rooms.map((r) => {
@@ -514,6 +526,18 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
           if (r.w <= 0 || r.h <= 0) return null;
           const active = isActiveRoom(r);
           const isLoc = isLocRoom(r);
+          // トイレは校内マップの性別 (男子=青 / 女子=赤 / 男女=2色) で色分けする。
+          // 選択中でも色分けを消さない (選択は太枠＋ピンで示す)。
+          const toiletGender = r.kind === 'toilet' ? (r.gender ?? inferToiletGender(r.name)) : undefined;
+          const fill = toiletGender
+            ? toiletGender === 'both'
+              ? TOILET_FILL.female
+              : TOILET_FILL[toiletGender]
+            : active
+              ? m3.primaryContainer
+              : ROOM_FILL[r.kind];
+          // 塗りが濃い色のトイレは文字・アイコンを白抜きにして視認性を保つ
+          const onFill = toiletGender ? '#FFFFFF' : active ? m3.onPrimaryContainer : m3.onSurface;
           const tappable =
             (roomsTappable ?? onPick == null) && (r.kind === 'class' || r.kind === 'jclass' || r.kind === 'club' || r.kind === 'outdoor');
           const body = (
@@ -525,18 +549,24 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
                   top: r.y,
                   width: r.w,
                   height: r.h,
-                  backgroundColor: active ? m3.primaryContainer : ROOM_FILL[r.kind],
+                  backgroundColor: fill,
                   borderColor: active ? m3.primary : isLoc ? m3.primary : m3.outlineVariant,
                   borderWidth: active ? 6 : isLoc ? 3 : 1.5,
                 },
               ]}
             >
+              {toiletGender === 'both' ? (
+                <View style={[styles.toiletSplit, { borderRadius: scaled(9, uiScale) }]} pointerEvents="none">
+                  <View style={[styles.toiletHalf, { backgroundColor: TOILET_FILL.female }]} />
+                  <View style={[styles.toiletHalf, { backgroundColor: TOILET_FILL.male }]} />
+                </View>
+              ) : null}
               {r.label ? (
                 <Text
                   style={[
                     type.labelMedium,
                     {
-                      color: active ? m3.onPrimaryContainer : m3.onSurface,
+                      color: onFill,
                       fontSize: labelFontSize,
                       lineHeight: labelFontSize * 1.2,
                       fontWeight: '600',
@@ -549,12 +579,26 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
                   {r.label}
                 </Text>
               ) : null}
-              {r.kind === 'stairs' || r.kind === 'elevator' || r.kind === 'toilet' ? (
+              {r.kind === 'stairs' || r.kind === 'elevator' ? (
                 <M3Icon
-                  name={r.kind === 'stairs' ? 'stairs' : r.kind === 'elevator' ? 'elevator' : 'wc'}
+                  name={r.kind === 'stairs' ? 'stairs' : 'elevator'}
                   size={sysIconSize}
                   color={m3.onSurfaceVariant}
                 />
+              ) : null}
+              {r.kind === 'toilet' ? (
+                toiletGender === 'both' ? (
+                  <View style={styles.toiletIconRow}>
+                    <M3Icon name="woman" size={sysIconSize} color="#FFFFFF" />
+                    <M3Icon name="man" size={sysIconSize} color="#FFFFFF" />
+                  </View>
+                ) : (
+                  <M3Icon
+                    name={toiletGender === 'female' ? 'woman' : toiletGender === 'male' ? 'man' : 'wc'}
+                    size={sysIconSize}
+                    color={toiletGender ? '#FFFFFF' : m3.onSurfaceVariant}
+                  />
+                )
               ) : null}
               {r.kind === 'vending' ? <VendingMachineIcon size={sysIconSize} color={m3.onSurfaceVariant} /> : null}
               {isLoc ? (
@@ -723,6 +767,15 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
         <Text style={[type.labelMedium, styles.metaText]}>特別教室</Text>
         <View style={[styles.legendSwatch, { backgroundColor: ROOM_FILL.outdoor }]} />
         <Text style={[type.labelMedium, styles.metaText]}>屋外</Text>
+        <View style={[styles.legendSwatch, { backgroundColor: TOILET_FILL.male }]} />
+        <Text style={[type.labelMedium, styles.metaText]}>{TOILET_GENDER_LABEL.male}</Text>
+        <View style={[styles.legendSwatch, { backgroundColor: TOILET_FILL.female }]} />
+        <Text style={[type.labelMedium, styles.metaText]}>{TOILET_GENDER_LABEL.female}</Text>
+        <View style={[styles.legendSwatch, styles.legendSwatchSplit]}>
+          <View style={[styles.toiletHalf, { backgroundColor: TOILET_FILL.female }]} />
+          <View style={[styles.toiletHalf, { backgroundColor: TOILET_FILL.male }]} />
+        </View>
+        <Text style={[type.labelMedium, styles.metaText]}>{TOILET_GENDER_LABEL.both}</Text>
       </View>
     </View>
   );
@@ -740,7 +793,7 @@ function createStyles(s: number, shape: M3Shape) {
       borderWidth: 1,
       borderColor: m3.outlineVariant,
     },
-    grid: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
+    grid: { position: 'absolute', left: GRID_LEFT, top: GRID_TOP, width: GRID_W, height: GRID_H },
     gridV: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: m3.outlineVariant, opacity: 0.5 },
     gridH: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: m3.outlineVariant, opacity: 0.5 },
     world: { position: 'absolute', left: '50%', top: '50%', marginLeft: -WORLD_W / 2, marginTop: -WORLD_H / 2 },
@@ -753,6 +806,18 @@ function createStyles(s: number, shape: M3Shape) {
       padding: scaled(4, s),
     },
     locDot: { position: 'absolute', top: scaled(2, s), right: scaled(2, s) },
+    // 男女トイレ: 女子(赤)・男子(青)の2色で塗り分ける
+    toiletSplit: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      right: 0,
+      bottom: 0,
+      flexDirection: 'row',
+      overflow: 'hidden',
+    },
+    toiletHalf: { flex: 1 },
+    toiletIconRow: { flexDirection: 'row', alignItems: 'center', gap: scaled(4, s) },
     selfAccuracy: { position: 'absolute', backgroundColor: 'rgba(26,115,232,0.16)' },
     selfDot: {
       position: 'absolute',
@@ -807,6 +872,7 @@ function createStyles(s: number, shape: M3Shape) {
       borderWidth: 1,
       borderColor: m3.outlineVariant,
     },
+    legendSwatchSplit: { flexDirection: 'row', overflow: 'hidden' },
     annBadge: {
       position: 'absolute',
       backgroundColor: m3.inverseSurface,
