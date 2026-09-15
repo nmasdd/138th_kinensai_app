@@ -17,7 +17,7 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
-    "place": "k中学3階工作室"
+    "place": "中学3階工作室"
   },
   {
     "id": "club-03",
@@ -27,7 +27,7 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
-    "place": "事務所前"
+    "place": "事務室前"
   },
   {
     "id": "club-04",
@@ -71,7 +71,7 @@
   },
   {
     "id": "club-08",
-    "className": "電波化学研究部ハム班",
+    "className": "電波科学研究部ハム班",
     "projectName": "展示と体験企画、両方やります",
     "description": "アマチュア無線の公開運用を行います！子供でも体験交信できます！",
     "ticketRequired": "unknown",
@@ -103,8 +103,8 @@
   {
     "id": "club-11",
     "className": "交通研究同好会",
-    "projectName": "体験企画、武士の販売、nゲージ展示",
-    "description": "電車でGO!の運転体験やNゲージ運転会、部誌販売をを行います。また、新企画の発車ベルスイッチ体験も行います。",
+    "projectName": "体験企画、部誌の販売、Nゲージ展示",
+    "description": "電車でGO!の運転体験やNゲージ運転会、部誌販売を行います。また、新企画の発車ベルスイッチ体験も行います。",
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
@@ -118,7 +118,7 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
-    "place": "事務室前,応接室12"
+    "place": "事務室前"
   },
   {
     "id": "club-13",
@@ -168,7 +168,7 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
-    "place": "高校面談室1,2,3,4と壁"
+    "place": "高校面談室1,2,3,4"
   },
   {
     "id": "club-18",
@@ -214,7 +214,7 @@
     "id": "club-22",
     "className": "中学ディベート部・高校ＥＳＳ部",
     "projectName": "実演発表",
-    "description": "２７日の１０時から、義務投票制についてについてモデルディベートを行います。是非、お越しください。",
+    "description": "２７日の１０時から、義務投票制についてモデルディベートを行います。是非、お越しください。",
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
@@ -339,7 +339,7 @@
     "ticketRequired": "unknown",
     "ticketTime": null,
     "kind": "volunteer",
-    "place": "面談室1,2,3,4"
+    "place": "中学面談室1,2,3,4"
   },
   {
     "id": "club-35",

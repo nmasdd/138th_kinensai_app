@@ -2,7 +2,7 @@
 export const festival = {
   name: '138th 記念祭',
   school: '東海中学校・高等学校',
-  theme: 'Passione 〜一点に集い、未来の熱へ〜',
+  theme: 'Passione　～一点に集う、幾千の熱～',
   dates: [
     { label: '9/26(土)', time: '12:00–16:00' },
     { label: '9/27(日)', time: '09:00–15:00' },
