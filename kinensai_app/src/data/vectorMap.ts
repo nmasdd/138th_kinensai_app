@@ -176,16 +176,16 @@ export const VECTOR_ROOMS: Record<VectorFloor, VectorRoom[]> = {
     { id: "sys-c45n", label: "", name: "北廊下", x: 220, y: 30, w: 660, h: 30, kind: "corridor" },
     { id: "sys-c45w", label: "", name: "西廊下", x: 220, y: 60, w: 30, h: 70, kind: "corridor" },
     { id: "sys-c45e", label: "", name: "東廊下", x: 850, y: 60, w: 30, h: 450, kind: "corridor" },
-    { id: "J1I", label: "1I", name: "中学1I", x: 250, y: 60, w: 110, h: 70, kind: "class" },
-    { id: "J1H", label: "1H", name: "中学1H", x: 360, y: 60, w: 110, h: 70, kind: "class" },
-    { id: "J1G", label: "1G", name: "中学1G", x: 470, y: 60, w: 110, h: 70, kind: "class" },
-    { id: "J1F", label: "1F", name: "中学1F", x: 580, y: 60, w: 110, h: 70, kind: "class" },
+    { id: "J1I", label: "1I", name: "中学1I", x: 250, y: 60, w: 110, h: 70, kind: "jclass" },
+    { id: "J1H", label: "1H", name: "中学1H", x: 360, y: 60, w: 110, h: 70, kind: "jclass" },
+    { id: "J1G", label: "1G", name: "中学1G", x: 470, y: 60, w: 110, h: 70, kind: "jclass" },
+    { id: "J1F", label: "1F", name: "中学1F", x: 580, y: 60, w: 110, h: 70, kind: "jclass" },
     { id: "club-32", label: "4階学習室", name: "4階学習室", x: 690, y: 60, w: 110, h: 70, kind: "club" },
-    { id: "J1E", label: "1E", name: "中学1E", x: 710, y: 160, w: 140, h: 70, kind: "class" },
-    { id: "J1D", label: "1D", name: "中学1D", x: 710, y: 230, w: 140, h: 70, kind: "class" },
-    { id: "J1C", label: "1C", name: "中学1C", x: 710, y: 300, w: 140, h: 70, kind: "class" },
-    { id: "J1B", label: "1B", name: "中学1B", x: 710, y: 370, w: 140, h: 70, kind: "class" },
-    { id: "J1A", label: "1A", name: "中学1A", x: 710, y: 440, w: 140, h: 70, kind: "class" },
+    { id: "J1E", label: "1E", name: "中学1E", x: 710, y: 160, w: 140, h: 70, kind: "jclass" },
+    { id: "J1D", label: "1D", name: "中学1D", x: 710, y: 230, w: 140, h: 70, kind: "jclass" },
+    { id: "J1C", label: "1C", name: "中学1C", x: 710, y: 300, w: 140, h: 70, kind: "jclass" },
+    { id: "J1B", label: "1B", name: "中学1B", x: 710, y: 370, w: 140, h: 70, kind: "jclass" },
+    { id: "J1A", label: "1A", name: "中学1A", x: 710, y: 440, w: 140, h: 70, kind: "jclass" },
     { id: "sys-h45art", label: "美術室", name: "高校美術室", x: 930, y: 390, w: 150, h: 100, kind: "hall" },
     { id: "club-44", label: "音楽室", name: "高校音楽室", x: 310, y: 300, w: 160, h: 140, kind: "club" },
     { id: "sys-h5b", label: "", name: "5F教室B", x: 310, y: 500, w: 130, h: 90, kind: "hall" },
@@ -245,7 +245,7 @@ export const VECTOR_ANNOTATIONS: Partial<Record<VectorFloor, VectorAnnotation[]>
 export const ROOM_FILL: Record<VectorRoom['kind'], string> = {
   class: '#FFDBCA', // 高校教室 (primaryContainer)
   jclass: '#BBDEFB', // 中学教室 (淡青。高校教室と区別するため)
-  club: '#FED8B7', // secondaryContainer
+  club: '#EADDFF', // 特別教室 (淡紫。高校教室のオレンジと区別するため)
   corridor: '#FFFFFF', // 通路は白 (原図どおり。背景 #E7E2DD と区別するため)
   stairs: '#FFE3C2', // tertiaryContainer
   elevator: '#FFE3C2', // EVも階段系の淡色 (アイコンで階段と区別)

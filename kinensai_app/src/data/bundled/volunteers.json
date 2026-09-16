@@ -162,7 +162,7 @@
   {
     "id": "club-13",
     "className": "書道部",
-    "projectName": "体験企画, 展示",
+    "projectName": "実演発表, 展示",
     "description": "土曜日13時から好きな字を書いてお渡しする企画を実施！部員の作品展示も行います。",
     "ticketRequired": "unknown",
     "ticketTime": null,
@@ -214,7 +214,7 @@
   {
     "id": "club-17",
     "className": "社会研究部地理部門",
-    "projectName": "体験企画, 研究発表, 展示, 販売",
+    "projectName": "体験企画, 展示, 販売・配布",
     "description": "地理にまつわる企画の展示と部誌の販売を行います。アマチュアもマニアも大歓迎！！あなたも地理の沼へ。",
     "ticketRequired": "unknown",
     "ticketTime": null,
@@ -475,7 +475,7 @@
   {
     "id": "club-37",
     "className": "沖縄学びプロジェクト",
-    "projectName": "研究発表",
+    "projectName": "展示",
     "description": "沖縄研修で学んだ平和、自然、文化学習を皆様にお伝えします。是非お越しください。",
     "ticketRequired": "unknown",
     "ticketTime": null,
@@ -540,7 +540,7 @@
   {
     "id": "club-42",
     "className": "地学部",
-    "projectName": "体験企画",
+    "projectName": "展示",
     "description": "野山を巡り化石や鉱石を採取し、その悠久の歴史を回想する事はこの上なく愉快な事です。当日はそんな化石や鉱石を展示しますので、ぜひともお楽しみください。",
     "ticketRequired": "unknown",
     "ticketTime": null,

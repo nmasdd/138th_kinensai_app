@@ -18,6 +18,19 @@ interface Props {
 export default function PerformerDetailModal({ group, visible, onClose, title = '出演団体' }: Props) {
   const { type } = useM3();
   const styles = useStyles();
+  const [measured, setMeasured] = React.useState<{ uri: string; ratio: number } | null>(null);
+  const imageUri = group?.imageUri;
+  const ratio = measured && measured.uri === imageUri ? measured.ratio : null;
+  React.useEffect(() => {
+    if (!imageUri) return;
+    let active = true;
+    Image.getSize(
+      imageUri,
+      (w, h) => { if (active && w > 0 && h > 0) setMeasured({ uri: imageUri, ratio: w / h }); },
+      () => {},
+    );
+    return () => { active = false; };
+  }, [imageUri]);
   return (
     <Modal visible={visible} animationType="none" transparent onRequestClose={onClose}>
       {group && (
@@ -33,7 +46,11 @@ export default function PerformerDetailModal({ group, visible, onClose, title = 
             </View>
             <ScrollView showsVerticalScrollIndicator={false}>
               {group.imageUri ? (
-                <Image source={{ uri: group.imageUri }} style={styles.photo} resizeMode="cover" />
+                <Image
+                  source={{ uri: group.imageUri }}
+                  style={[styles.photo, ratio ? { aspectRatio: ratio } : styles.photoFallback]}
+                  resizeMode="contain"
+                />
               ) : (
                 <View style={styles.photoEmpty}>
                   <M3Icon name="groups" size={40} color={m3.onSurfaceVariant} />
@@ -86,10 +103,10 @@ function createStyles(s: number) {
     },
     photo: {
       width: '100%',
-      height: scaled(180, s),
       borderRadius: scaled(16, s),
       backgroundColor: m3.surfaceContainerHighest,
     },
+    photoFallback: { height: scaled(180, s) },
     photoEmpty: {
       width: '100%',
       height: scaled(180, s),

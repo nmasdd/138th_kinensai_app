@@ -527,17 +527,15 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
           const active = isActiveRoom(r);
           const isLoc = isLocRoom(r);
           // トイレは校内マップの性別 (男子=青 / 女子=赤 / 男女=2色) で色分けする。
-          // 選択中でも色分けを消さない (選択は太枠＋ピンで示す)。
+          // 選択の有無で塗りは変えず、選択は太枠＋ピンで示す (部屋種別の色を保つ)。
           const toiletGender = r.kind === 'toilet' ? (r.gender ?? inferToiletGender(r.name)) : undefined;
           const fill = toiletGender
             ? toiletGender === 'both'
               ? TOILET_FILL.female
               : TOILET_FILL[toiletGender]
-            : active
-              ? m3.primaryContainer
-              : ROOM_FILL[r.kind];
+            : ROOM_FILL[r.kind];
           // 塗りが濃い色のトイレは文字・アイコンを白抜きにして視認性を保つ
-          const onFill = toiletGender ? '#FFFFFF' : active ? m3.onPrimaryContainer : m3.onSurface;
+          const onFill = toiletGender ? '#FFFFFF' : m3.onSurface;
           const tappable =
             (roomsTappable ?? onPick == null) && (r.kind === 'class' || r.kind === 'jclass' || r.kind === 'club' || r.kind === 'outdoor');
           const body = (

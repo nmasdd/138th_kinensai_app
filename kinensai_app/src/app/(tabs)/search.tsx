@@ -31,8 +31,16 @@ type GenreFilter =
   | '体験企画'
   | '販売・配布'
   | '研究発表'
-  | 'クラブ';
+  | 'クラブ'
+  | 'パロディ'
+  | 'アクション'
+  | '謎解き・脱出'
+  | 'ヒューマンドラマ'
+  | '映像作品'
+  | 'アドベンチャー'
+  | '占い';
 
+/** クラス企画の大分類と有志企画の区分 (パンフレットの分類軸) */
 const GENRE_FILTERS: GenreFilter[] = [
   'all',
   '演劇',
@@ -46,6 +54,17 @@ const GENRE_FILTERS: GenreFilter[] = [
   'クラブ',
 ];
 
+/** クラス企画カード下部の細分ジャンル (パンフレット p.23) */
+const SUBGENRE_FILTERS: GenreFilter[] = [
+  'パロディ',
+  'アクション',
+  '謎解き・脱出',
+  'ヒューマンドラマ',
+  '映像作品',
+  'アドベンチャー',
+  '占い',
+];
+
 const GENRE_LABEL: Record<GenreFilter, string> = {
   all: 'すべて',
   演劇: '演劇',
@@ -57,6 +76,13 @@ const GENRE_LABEL: Record<GenreFilter, string> = {
   '販売・配布': '販売・配布',
   研究発表: '研究発表',
   クラブ: 'クラブ',
+  パロディ: 'パロディ',
+  アクション: 'アクション',
+  '謎解き・脱出': '謎解き・脱出',
+  ヒューマンドラマ: 'ヒューマンドラマ',
+  映像作品: '映像作品',
+  アドベンチャー: 'アドベンチャー',
+  占い: '占い',
 };
 
 function isMogiten(ex: Exhibition): boolean {
@@ -107,8 +133,10 @@ export default function SearchScreen() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return exhibitions.filter((ex) => {
-      if (kind === 'class' || kind === 'volunteer') {
-        if (ex.kind !== kind) return false;
+      if (kind === 'class') {
+        if (ex.kind !== 'class' || isMogiten(ex)) return false;
+      } else if (kind === 'volunteer') {
+        if (ex.kind !== 'volunteer') return false;
       } else if (kind === 'mogiten') {
         if (!isMogiten(ex)) return false;
       } else if (kind === 'fav') {
@@ -185,6 +213,10 @@ export default function SearchScreen() {
           ))}
           <Text style={[type.labelLarge, styles.filterHeading]}>ジャンル</Text>
           {GENRE_FILTERS.map((g) => (
+            <M3FilterChip key={g} label={GENRE_LABEL[g]} selected={genre === g} onPress={() => setGenre(g)} />
+          ))}
+          <Text style={[type.labelLarge, styles.filterHeading]}>クラス企画の細分ジャンル</Text>
+          {SUBGENRE_FILTERS.map((g) => (
             <M3FilterChip key={g} label={GENRE_LABEL[g]} selected={genre === g} onPress={() => setGenre(g)} />
           ))}
         </View>
