@@ -7,6 +7,27 @@ import { festival } from '../data/festival';
 const DESCRIPTION = `${festival.school} ${festival.name}の公式アプリ。タイムテーブル・企画検索・校内マップ・QR読み取りなどを確認できます。`;
 
 /**
+ * PWA のインストール可否イベント (beforeinstallprompt) は React のマウント前に
+ * 発火することがあるため、head の時点で捕捉して window に保持する。
+ * `utils/installPrompt.ts` がこの保持値とカスタムイベントを購読して
+ * インストールバナーを表示する。appinstalled も同様に記録する。
+ */
+const INSTALL_CAPTURE_SCRIPT = `(function(){
+  window.__installPromptEvent = null;
+  window.__appInstalled = false;
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    window.__installPromptEvent = e;
+    window.dispatchEvent(new Event('kinensai:installprompt'));
+  });
+  window.addEventListener('appinstalled', function(){
+    window.__appInstalled = true;
+    window.__installPromptEvent = null;
+    window.dispatchEvent(new Event('kinensai:installed'));
+  });
+})();`;
+
+/**
  * Web のルート HTML。静的描画時に Node.js でのみ実行される。
  * 言語・PWA (マニフェスト / テーマカラー / ホーム画面追加) の head をここで宣言する。
  * ページごとの <title> は各画面の TopAppBar が expo-router/head で設定する。
@@ -38,6 +59,7 @@ export default function Root({ children }: PropsWithChildren) {
           縮小表示自体を起こさないようにする (`!important` で上記注入スタイルに優先)。
         */}
         <style>{'body{height:100% !important;max-width:100% !important;overflow-x:hidden !important;}'}</style>
+        <script dangerouslySetInnerHTML={{ __html: INSTALL_CAPTURE_SCRIPT }} />
       </head>
       <body>{children}</body>
     </html>

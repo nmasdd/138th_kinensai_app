@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { M3Card, M3EmptyState, M3FAB, M3FilterChip, M3Icon, M3ImagePlaceholder, M3LoadingView, M3SearchBar, TopAppBar } from '../../components/m3';
-import { Rise, ScreenFade, Stagger } from '../../components/anim';
+import { M3Card, M3EmptyState, M3FAB, M3FilterChip, M3Icon, M3ImagePlaceholder, M3LoadingView, M3SearchBar, M3Touch, TopAppBar, m3scrim } from '../../components/m3';
+import { FadeOverlay, Pop, Rise, ScreenFade, Stagger } from '../../components/anim';
 import ExhibitionDetailModal from '../../components/ExhibitionDetailModal';
 import { genreLabel, loadAllExhibitions, matchesGenre, displayClassName, type Exhibition } from '../../data/exhibitions';
 import { useFavorites } from '../../data/favorites';
@@ -205,23 +205,42 @@ export default function SearchScreen() {
           <M3SearchBar value={query} onChangeText={setQuery} placeholder="検索" />
         </View>
       </ScreenFade>
-      {filterOpen && (
-        <Rise>
-          <View style={styles.filterPanel} accessibilityRole="none" accessibilityLabel="絞り込み条件">
-          {(Object.keys(KIND_LABEL) as KindFilter[]).map((k) => (
-            <M3FilterChip key={k} label={KIND_LABEL[k]} selected={kind === k} onPress={() => setKind(k)} />
-          ))}
-          <Text style={[type.labelLarge, styles.filterHeading]}>ジャンル</Text>
-          {GENRE_FILTERS.map((g) => (
-            <M3FilterChip key={g} label={GENRE_LABEL[g]} selected={genre === g} onPress={() => setGenre(g)} />
-          ))}
-          <Text style={[type.labelLarge, styles.filterHeading]}>クラス企画の細分ジャンル</Text>
-          {SUBGENRE_FILTERS.map((g) => (
-            <M3FilterChip key={g} label={GENRE_LABEL[g]} selected={genre === g} onPress={() => setGenre(g)} />
-          ))}
-        </View>
-        </Rise>
-      )}
+      <Modal visible={filterOpen} animationType="none" transparent onRequestClose={() => setFilterOpen(false)}>
+        <FadeOverlay style={styles.filterOverlay}>
+          <Pop style={styles.filterPop}>
+            <View style={styles.filterHeader}>
+              <Text style={[type.titleLarge, { color: m3.onSurface }]} accessibilityRole="header">
+                絞り込み
+              </Text>
+              <M3Touch onPress={() => setFilterOpen(false)} label="絞り込みを閉じる" round style={styles.filterClose}>
+                <M3Icon name="close" size={24} color={m3.onSurfaceVariant} />
+              </M3Touch>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+              <M3FilterChip
+                key="all"
+                label={KIND_LABEL.all}
+                selected={kind === 'all' && genre === 'all'}
+                onPress={() => {
+                  setKind('all');
+                  setGenre('all');
+                }}
+              />
+              {(Object.keys(KIND_LABEL) as KindFilter[])
+                .filter((k) => k !== 'all')
+                .map((k) => (
+                  <M3FilterChip key={k} label={KIND_LABEL[k]} selected={kind === k} onPress={() => setKind(k)} />
+                ))}
+              {GENRE_FILTERS.filter((g) => g !== 'all').map((g) => (
+                <M3FilterChip key={g} label={GENRE_LABEL[g]} selected={genre === g} onPress={() => setGenre(g)} />
+              ))}
+              {SUBGENRE_FILTERS.map((g) => (
+                <M3FilterChip key={g} label={GENRE_LABEL[g]} selected={genre === g} onPress={() => setGenre(g)} />
+              ))}
+            </ScrollView>
+          </Pop>
+        </FadeOverlay>
+      </Modal>
       <Rise delay={40}>
         <View style={styles.resultInfo}>
           <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]} accessibilityLiveRegion="polite">
@@ -274,7 +293,7 @@ export default function SearchScreen() {
         <M3FAB
           icon="filter-alt"
           label="絞り込み"
-          onPress={() => setFilterOpen((v) => !v)}
+          onPress={() => setFilterOpen(true)}
           style={styles.fab}
         />
       </View>
@@ -299,15 +318,33 @@ function createStyles(s: number) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: m3.surface },
     searchWrap: { paddingHorizontal: scaled(16, s), paddingTop: scaled(8, s) },
-    filterPanel: {
+    filterOverlay: { flex: 1, justifyContent: 'center', backgroundColor: m3scrim },
+    filterPop: {
+      backgroundColor: m3.surfaceContainerLow,
+      borderRadius: scaled(28, s),
+      margin: scaled(24, s),
+      padding: scaled(20, s),
+      maxHeight: '80%',
+    },
+    filterHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: scaled(12, s),
+    },
+    filterClose: {
+      width: scaled(44, s),
+      height: scaled(44, s),
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    chipRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: scaled(8, s),
-      paddingHorizontal: scaled(16, s),
-      paddingTop: scaled(8, s),
+      paddingBottom: scaled(4, s),
     },
     resultInfo: { paddingHorizontal: scaled(16, s), paddingVertical: scaled(12, s) },
-    filterHeading: { width: '100%', color: m3.onSurfaceVariant, marginTop: scaled(4, s) },
     listWrap: { flex: 1 },
     list: { paddingHorizontal: scaled(16, s), paddingBottom: scaled(96, s), gap: scaled(16, s) },
     card: { padding: 0 },

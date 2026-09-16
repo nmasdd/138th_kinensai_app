@@ -26,6 +26,7 @@ Read versioned docs at https://docs.expo.dev/versions/v56.0.0/ before writing co
 - Browser tab titles come from `TopAppBar` (`src/components/m3.tsx`) rendering `expo-router/head` `<Head><title>` with `src/data/pageTitles.ts` `pageTitle()`. `options.title` does NOT set `document.title` on web in this version.
 - Root HTML is `src/app/+html.tsx` (web-only, Node during export): `lang="ja"`, description, theme-color, manifest, apple meta. Do not add `<link rel="icon">` (expo CLI injects `/favicon.ico` from `app.json` `web.favicon`).
 - PWA: `public/manifest.webmanifest`, `public/sw.js` (cache name `kinensai-v1`; skips `/api/`), icons under `public/icons/`. Registration lives in `src/utils/serviceWorker.ts`, called from `_layout.web.tsx` only when `!__DEV__`.
+- PWA install prompt: `+html.tsx` head captures `beforeinstallprompt`/`appinstalled` into `window.__installPromptEvent` (React mounts too late otherwise). `src/utils/installPrompt.ts` holds the state (`useInstallState`/`useIsStandalone`), `src/components/InstallPrompt.tsx` is the bottom banner mounted in `_layout.web.tsx`. Chrome prompts; iOS/others show manual instructions; dismissal persists via `install-prompt.json` (per-user key, see `src/data/publish.ts`). Menu has a web-only「アプリをインストール」entry (`openInstallFromMenu`). Auto-show needs the SW/prod build, so it does not appear under `expo start --web`.
 - Regenerate every icon (app + PWA) from `icon/logo.png` with `python tools/icons/gen_icons.py`.
 
 ## Dev vs prod

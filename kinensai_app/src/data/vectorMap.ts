@@ -243,9 +243,9 @@ export const VECTOR_ANNOTATIONS: Partial<Record<VectorFloor, VectorAnnotation[]>
 
 /** 部屋種別ごとの塗り色 (M3ロール由来の淡色で統一) */
 export const ROOM_FILL: Record<VectorRoom['kind'], string> = {
-  class: '#FFDBCA', // 高校教室 (primaryContainer)
-  jclass: '#BBDEFB', // 中学教室 (淡青。高校教室と区別するため)
-  club: '#EADDFF', // 特別教室 (淡紫。高校教室のオレンジと区別するため)
+  class: '#FFB74D', // 高校教室 (橙)
+  jclass: '#BBDEFB', // 中学教室 (水色)
+  club: '#FFF176', // 特別教室 (黄。高校教室の橙と区別するため)
   corridor: '#FFFFFF', // 通路は白 (原図どおり。背景 #E7E2DD と区別するため)
   stairs: '#FFE3C2', // tertiaryContainer
   elevator: '#FFE3C2', // EVも階段系の淡色 (アイコンで階段と区別)

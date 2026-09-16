@@ -7,7 +7,7 @@
  */
 
 /** 端末個人データのキー (配信対象外)。 */
-const PER_USER_KEYS = new Set<string>(['favorites.json', 'stage-votes.json']);
+const PER_USER_KEYS = new Set<string>(['favorites.json', 'stage-votes.json', 'install-prompt.json']);
 
 /** 端末個人データのキーか (配信対象外)。 */
 export function isPerUserKey(key: string): boolean {
