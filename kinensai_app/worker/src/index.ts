@@ -8,6 +8,8 @@
  * - POST /api/content/publish { token, files: { name: value } } → 管理者トークンでKVへ公開
  * - POST /api/images/upload { token, contentType, data(base64) } → 画像をKVへ格納し公開URLを返す
  * - GET  /api/images/<key>                 → 画像を公開配信 (認証不要・長期キャッシュ)
+ * - POST /api/votes { voterId, groupId }   → オーディエンス投票を1票記録/変更/取消 (認証不要)
+ * - POST /api/votes/results { token }      → 投票の集計 (団体別得票数・合計) を返す (管理者のみ)
  * - 上記以外 → ASSETS.fetch(request) (Expo Web の静的配信。SPAフォールバックは
  *   wrangler.toml の assets.not_found_handling に従う)
  *
@@ -39,6 +41,11 @@ interface KvBinding {
     (key: string, value: ArrayBuffer): Promise<void>;
   };
   delete: (key: string) => Promise<void>;
+  list: (options?: {
+    prefix?: string;
+    limit?: number;
+    cursor?: string;
+  }) => Promise<{ keys: Array<{ name: string }>; list_complete: boolean; cursor?: string }>;
 }
 
 interface Env {
@@ -93,6 +100,19 @@ const CONTENT_KEYS = new Set([
 const META_KEY = '_meta.json';
 
 /**
+ * オーディエンス投票のKVキー。
+ * - `vote:voter:<voterId>` → その端末が投票した団体ID (変更のため保持する)
+ * - `vote:count:<groupId>` → 団体ごとの得票数
+ * 得票数は団体別のカウンタを読み書きして更新する (投票の変更時は旧団体を減算)。
+ */
+const VOTER_KEY_PREFIX = 'vote:voter:';
+const COUNT_KEY_PREFIX = 'vote:count:';
+/** 端末が生成する投票者ID (ASCII)。 */
+const VOTER_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+/** 団体ID。制御文字・空白・スラッシュを除く (日本語可)。 */
+const GROUP_ID_RE = /^[^\u0000-\u001F\u007F/\s]{1,128}$/;
+
+/**
  * 共有コンテンツのキャッシュ制御。反映目標30秒以内のため短命にし、
  * 期限切れ後は stale を返しつつバックグラウンドで再検証させる。
  */
@@ -104,6 +124,7 @@ const META_CACHE_CONTROL = 'public, max-age=10';
 const attempts = new Map<string, { count: number; resetAt: number }>();
 const LOGIN_ATTEMPT_LIMIT = 10;
 const PUBLISH_ATTEMPT_LIMIT = 30;
+const VOTE_ATTEMPT_LIMIT = 120;
 const ATTEMPT_WINDOW_MS = 5 * 60 * 1000;
 
 const te = new TextEncoder();
@@ -397,6 +418,92 @@ async function handleContentPublish(request: Request, env: Env): Promise<Respons
   return json({ ok: true, published: names, version });
 }
 
+/** 団体の得票カウンタを delta だけ増減する (0以下になったらキーを消す)。 */
+async function adjustVoteCount(env: Env, groupId: string, delta: number): Promise<void> {
+  const key = COUNT_KEY_PREFIX + groupId;
+  const raw = await env.CONTENT.get(key, 'text');
+  const cur = raw ? Number(raw) : 0;
+  const base = Number.isFinite(cur) ? cur : 0;
+  const next = Math.max(0, base + delta);
+  if (next === 0) {
+    await env.CONTENT.delete(key);
+    return;
+  }
+  await env.CONTENT.put(key, String(next));
+}
+
+/**
+ * オーディエンス投票の記録 (認証不要)。
+ * 1端末1票。同じ voterId の再投票は「変更」として旧団体を減算し新団体を加算する。
+ * `groupId` が空文字なら投票の取消。
+ *
+ * 注: KV は結果整合のため、同時投票の合算はごく稀にずれ得る (学校祭規模では許容)。
+ */
+async function handleVote(request: Request, env: Env): Promise<Response> {
+  const ip = clientIp(request);
+  if (rateLimited(ip, 'vote', VOTE_ATTEMPT_LIMIT)) return json({ ok: false }, 429);
+
+  const body = await readJsonBody(request);
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return json({ ok: false }, 400);
+  }
+  const obj = body as Record<string, unknown>;
+  const voterId = String(obj.voterId ?? '');
+  const groupId = obj.groupId == null ? '' : String(obj.groupId);
+  if (!VOTER_ID_RE.test(voterId)) return json({ ok: false }, 400);
+  if (groupId && !GROUP_ID_RE.test(groupId)) return json({ ok: false }, 400);
+
+  const voterKey = VOTER_KEY_PREFIX + voterId;
+  const prev = await env.CONTENT.get(voterKey, 'text');
+
+  if (groupId === '') {
+    if (prev) await adjustVoteCount(env, prev, -1);
+    await env.CONTENT.delete(voterKey);
+    return json({ ok: true, changed: prev !== null });
+  }
+  if (prev === groupId) return json({ ok: true, changed: false });
+  if (prev) await adjustVoteCount(env, prev, -1);
+  await adjustVoteCount(env, groupId, 1);
+  await env.CONTENT.put(voterKey, groupId);
+  return json({ ok: true, changed: true });
+}
+
+/**
+ * 投票の集計 (管理者トークン必須)。
+ * `vote:count:` の全キーを列挙し、団体別の得票数と合計を返す。
+ */
+async function handleVoteResults(request: Request, env: Env): Promise<Response> {
+  const sessionSecret = env.ADMIN_SESSION_SECRET ?? '';
+  if (!sessionSecret) return json({ ok: false }, 500);
+  const body = await readJsonBody(request);
+  const token =
+    typeof body === 'object' && body !== null && 'token' in body
+      ? String((body as { token: unknown }).token ?? '')
+      : '';
+  if (!(await verifyAdminToken(token, sessionSecret))) return json({ ok: false }, 401);
+
+  const counts: Record<string, number> = {};
+  let total = 0;
+  let cursor: string | undefined;
+  for (let page = 0; page < 20; page++) {
+    const listed = await env.CONTENT.list({ prefix: COUNT_KEY_PREFIX, limit: 1000, cursor });
+    for (const { name } of listed.keys) {
+      const groupId = name.slice(COUNT_KEY_PREFIX.length);
+      if (!groupId) continue;
+      const raw = await env.CONTENT.get(name, 'text');
+      const n = raw ? Number(raw) : 0;
+      if (Number.isFinite(n) && n > 0) {
+        counts[groupId] = n;
+        total += n;
+      }
+    }
+    if (listed.list_complete) break;
+    cursor = listed.cursor;
+    if (!cursor) break;
+  }
+  return json({ ok: true, total, counts, updatedAt: Date.now() });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -423,6 +530,12 @@ export default {
       url.pathname.startsWith('/api/images/')
     ) {
       return handleImageGet(request, url.pathname.slice('/api/images/'.length), env);
+    }
+    if (request.method === 'POST' && url.pathname === '/api/votes') {
+      return handleVote(request, env);
+    }
+    if (request.method === 'POST' && url.pathname === '/api/votes/results') {
+      return handleVoteResults(request, env);
     }
     return env.ASSETS.fetch(request);
   },

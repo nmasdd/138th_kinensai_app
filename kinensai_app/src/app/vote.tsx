@@ -15,7 +15,7 @@ export default function VoteScreen() {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
-  const { groups, votedId, vote, isLoading } = useStageGroups();
+  const { groups, votedId, vote, clearVote, isLoading } = useStageGroups();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -49,7 +49,7 @@ export default function VoteScreen() {
           ) : (
             <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
               <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
-                応援したい出演者を1組選んで投票してください (変更可・端末に保存)。
+                応援したい出演者を1組選んで投票してください (変更可・1台1票。結果は運営が集計します)。
               </Text>
               {filtered.map((g, i) => {
                 const voted = votedId === g.id;
@@ -78,7 +78,7 @@ export default function VoteScreen() {
                           icon={voted ? 'favorite' : 'favorite-border'}
                           label={voted ? `${g.name}への投票を取り消す` : `${g.name}に投票する`}
                           selected={voted}
-                          onPress={() => vote(g.id)}
+                          onPress={() => (voted ? clearVote() : vote(g.id))}
                         />
                       </View>
                     </View>

@@ -46,6 +46,7 @@ export default function RootLayout() {
           <Stack.Screen name="admin/notifications" />
           <Stack.Screen name="admin/stage" />
           <Stack.Screen name="admin/picks" />
+          <Stack.Screen name="admin/votes" />
           <Stack.Screen name="admin/data" />
         </Stack>
         {/* PWA インストールを促す下部バナー (全画面の上に重ねる) */}

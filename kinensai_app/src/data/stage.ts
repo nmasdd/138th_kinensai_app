@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
-import * as FileSystem from 'expo-file-system/legacy';
-import { loadJSON, saveJSON } from './kvStore';
+import { clearLocalKey, loadJSON, saveJSON } from './kvStore';
+import { getVoterId, submitVote } from './votes';
 import { useContentEffect } from '../context/useContentRefreshKey';
 import type { StageItem } from './timetable';
 import stageGroupsJson from './bundled/stage-groups.json';
@@ -68,7 +68,7 @@ export function groupStageItems(groups: StageGroup[]): StageItem[] {
   return out;
 }
 
-const VOTES_FILE = `${FileSystem.documentDirectory}stage-votes.json`;
+const VOTES_KEY = 'stage-votes.json';
 const GROUPS_KEY = 'stage-groups.json';
 const AUDITORIUM_GROUPS_KEY = 'auditorium-groups.json';
 
@@ -110,24 +110,16 @@ export function usePerformerGroups(kind: 'stage' | 'auditorium' = 'stage') {
   useContentEffect(() => {
     let cancelled = false;
     (async () => {
+      // 投票者IDを早めに確定させる (未生成なら作成して端末保存)
+      void getVoterId();
       const [loadedGroups, savedVote] = await Promise.all([
         loadGroupsOf(key, fallback),
-        (async () => {
-          try {
-            if (!FileSystem.documentDirectory) return null;
-            const info = await FileSystem.getInfoAsync(VOTES_FILE);
-            if (!info.exists) return null;
-            const raw = await FileSystem.readAsStringAsync(VOTES_FILE);
-            const parsed: unknown = JSON.parse(raw);
-            return typeof parsed === 'string' ? parsed : null;
-          } catch {
-            return null;
-          }
-        })(),
+        loadJSON<unknown>(VOTES_KEY, null),
       ]);
       if (cancelled) return;
       setGroups(loadedGroups.map(withContentImage));
-      if (savedVote) setVotedId(savedVote);
+      if (typeof savedVote === 'string') setVotedId(savedVote);
+      else setVotedId(null);
       setIsLoading(false);
     })();
     return () => {
@@ -135,15 +127,21 @@ export function usePerformerGroups(kind: 'stage' | 'auditorium' = 'stage') {
     };
   }, [key, fallback]);
 
+  // 投票/変更。端末の表示を即更新しつつ Worker へ送信して集計に反映する。
   const vote = useCallback((id: string) => {
     setVotedId(id);
-    if (!FileSystem.documentDirectory) return;
-    FileSystem.writeAsStringAsync(VOTES_FILE, JSON.stringify(id), {
-      encoding: FileSystem.EncodingType.UTF8,
-    }).catch(() => {});
+    saveJSON(VOTES_KEY, id).catch(() => {});
+    void submitVote(id);
   }, []);
 
-  return { groups, votedId, vote, isLoading };
+  // 投票の取消。端末の表示を消し、サーバ側の票も取り消す。
+  const clearVote = useCallback(() => {
+    setVotedId(null);
+    clearLocalKey(VOTES_KEY).catch(() => {});
+    void submitVote(null);
+  }, []);
+
+  return { groups, votedId, vote, clearVote, isLoading };
 }
 
 /** 後方互換: ステージ出演団体のフック。 */
