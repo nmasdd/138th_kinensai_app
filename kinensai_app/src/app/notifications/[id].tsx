@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
-import { M3Button, M3LoadingView, TopAppBar, goBackOrHome } from '../../components/m3';
+import Head from 'expo-router/head';
+import { M3Button, M3LoadingView, goBackOrHome } from '../../components/m3';
 import { ScreenFade } from '../../components/anim';
 import { loadNotifications, type AppNotification } from '../../data/notifications';
+import { pageTitle } from '../../data/pageTitles';
 import { m3, scaled } from '../../theme';
 import { useM3 } from '../../context/responsive';
 
@@ -30,7 +32,9 @@ export default function NotificationDetailScreen() {
   if (item === undefined) {
     return (
       <SafeAreaView style={styles.center} edges={['top']}>
-        <TopAppBar title="通知" />
+        <Head>
+          <title>{pageTitle('通知')}</title>
+        </Head>
         <M3LoadingView />
       </SafeAreaView>
     );
@@ -38,11 +42,23 @@ export default function NotificationDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <TopAppBar title={item?.title ?? '通知'} />
-      <ScreenFade>
-        <View style={styles.body}>
+      <Head>
+        <title>{pageTitle(item?.title ?? '通知')}</title>
+      </Head>
+      <ScreenFade style={styles.fill}>
+        <ScrollView
+          style={styles.fill}
+          contentContainerStyle={styles.body}
+          showsVerticalScrollIndicator={false}
+        >
           {item ? (
             <>
+              <Text
+                accessibilityRole="header"
+                style={[type.headlineSmall, { color: m3.onSurface, textAlign: 'center', marginBottom: 8 }]}
+              >
+                {item.title}
+              </Text>
               <Text style={[type.labelMedium, { color: m3.onSurfaceVariant, marginBottom: 12 }]}>{item.date}</Text>
               <Text style={[type.bodyLarge, { color: m3.onSurface, textAlign: 'center' }]}>{item.body}</Text>
             </>
@@ -51,7 +67,7 @@ export default function NotificationDetailScreen() {
               この通知は見つかりませんでした。
             </Text>
           )}
-        </View>
+        </ScrollView>
       </ScreenFade>
       <View style={[styles.backWrap, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <M3Button label="通知一覧に戻る" icon="undo" onPress={() => goBackOrHome('/notifications' as never)} />
@@ -62,9 +78,10 @@ export default function NotificationDetailScreen() {
 
 function createStyles(s: number) {
   return StyleSheet.create({
+    fill: { flex: 1 },
     container: { flex: 1, backgroundColor: m3.surface },
     center: { flex: 1, backgroundColor: m3.surface },
-    body: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: scaled(24, s) },
+    body: { flexGrow: 1, justifyContent: 'flex-start', alignItems: 'center', padding: scaled(24, s) },
     backWrap: { alignItems: 'flex-end', paddingHorizontal: scaled(16, s), paddingBottom: scaled(16, s) },
   });
 }

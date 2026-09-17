@@ -64,11 +64,9 @@ export default function PerformerDetailModal({ group, visible, onClose, title = 
                   </View>
                 ) : null}
               </View>
-              {group.detail ? (
-                <Text style={[type.bodyLarge, { color: m3.onSurfaceVariant }]}>{group.detail}</Text>
-              ) : null}
+              {/* 短い紹介 (detail) は一覧カード用。モーダルでは長い紹介文のみ表示する */}
               <M3Divider style={styles.divider} />
-              <Text style={[type.bodyMedium, { color: m3.onSurface }]}>
+              <Text style={[type.bodyLarge, { color: m3.onSurface }]}>
                 {group.intro || group.detail || '紹介文は準備中です。'}
               </Text>
             </ScrollView>

@@ -10,8 +10,9 @@
  * 対応付け根拠: ベクター部屋名表示と src/data/bundled/class-catalog.json の id
  * および src/data/volunteers.ts の place。高校HR教室 (1A〜1J・2A〜2J)
  * は全20教室を登録済み。部活系はベクター上に部屋ブロックとして描画され、
- * place 文字列で一意に特定できるもののみ登録し、講堂・中庭・事務室前・
- * ピロティ・食堂ラベル・視聴覚室 (図上は凡例のみ) などは対象外。
+ * place 文字列で一意に特定できるもののみ登録し、講堂・事務室前・
+ * ピロティ・視聴覚室 (図上は凡例のみ) などは対象外。中庭は屋外施設
+ * (`sys-yard1`) として登録し、`roomId` で部屋を指定する。
  * 同一教室に複数企画がある場合 (2F/2F-2、中学1階学習室ほか) は
  * 代表 id のマーカー1件に `sharedIds` で同居企画をぶら下げ、
  * 同一座標への重ね置きを避ける (ずらし配置は22pxマーカー同士が
@@ -35,6 +36,11 @@ export interface MapHotspot {
   label?: string;
   /** 同一教室に同居する別企画の Exhibition id 一覧 (代表マーカーで共有表示) */
   sharedIds?: string[];
+  /**
+   * 企画の id と部屋の id が一致しない施設会場 (中庭など) の部屋ID。
+   * 選択時にこの部屋をハイライトする (`sys-yard1` など)。
+   */
+  roomId?: string;
 }
 
 export const MAP_HOTSPOTS: MapHotspot[] = [
@@ -73,6 +79,9 @@ export const MAP_HOTSPOTS: MapHotspot[] = [
   { id: 'club-22', floor: '1階', x: 0.597, y: 0.148, label: '1学', sharedIds: ['club-23'] },
   // 中学生徒会室ブロック (中央右の水色ブロック)。
   { id: 'club-39', floor: '1階', x: 0.69, y: 0.37, label: '生徒会' },
+  // 中庭 (中央の屋外施設 sys-yard1)。中学生徒会 子供企画と地学部 展示が行われる。
+  { id: 'club-40', floor: '1階', x: 0.475, y: 0.564, label: '中庭', roomId: 'sys-yard1' },
+  { id: 'club-42', floor: '1階', x: 0.475, y: 0.564, label: '中庭', roomId: 'sys-yard1' },
   // ステージ (晴天時) ブロック (右下ピンク)。club-07 は講堂・中庭との
   // 複数場所併記のため特定できず対象外とし、単独指定の club-27 のみ登録。
   { id: 'club-27', floor: '1階', x: 0.84, y: 0.748, label: 'ステ' },

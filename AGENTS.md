@@ -25,7 +25,7 @@
 ## データ・素材
 - 同梱の共有コンテンツ正本は `kinensai_app/src/data/bundled/*.json` に集約 (`volunteers.json`=有志46件、`stage-groups.json`=ステージ出演団体13件、`auditorium-groups.json`=講堂出演団体26件、`class-catalog.json`=クラス企画48件)。クラス企画は `genre`(大分類: 演劇/テーマツアー/パフォーマンス)＋`subGenres`、有志企画は `genres`(展示/実演発表/体験企画/販売・配布/研究発表/クラブ) を持つ。TSはimportするだけにし、リテラルを増やさない。TSリテラルだった `classContent.ts`/旧 `planning/*.txt`/旧 `classCatalog.json` は廃止済み。
 - `パンフレット内容抽出.md` (ルート直下) — パンフレット (『138th記念祭パンフレット完成のコピー.pdf』全84p) の企画内容を改変せず書き起こした**照合の正本**。各項目に `[p.NN]` のページ根拠付きで、クラス企画/有志企画/ステージ企画/講堂企画/タイムテーブル/注意事項/物販/食堂などを収録。アプリの企画データを照合・修正するときの基準にする。末尾「## 追補（情報探索の結果）」に、パンフ未掲載で申請フォーム (`記念祭企画申請・紹介文フォーム（回答） (1).xlsx`) 由来の情報・判読不能箇所・表記ゆれを記載。
-- `kinensai_app/time/Auditorium.csv` — 講堂タイムテーブル。4列 `team,day,start,end` (`day: 0=土,1=日`)、5列 (ID付き) もパーサが許容。遅延表示・リアルタイム更新は未実装。
+- `kinensai_app/time/Auditorium.csv` — 講堂タイムテーブル。`kinensai_app/time/Stage.csv` — ステージ (野外) タイムテーブル。どちらも4列 `team,day,start,end` (`day: 0=土,1=日`)、5列 (ID付き) もパーサが許容。ステージは1団体が1日に複数回出演するため1出演=1行で、IDは `stage-<行番号>`。時間割はCSVが正で、`stage-groups.json`/`auditorium-groups.json` は紹介文・写真などのメタ情報のみ。表示・遅延反映は実装済み、リアルタイム配信は未実装。
 - `HP/` — ホーム画面の文言ソース。`校内マップ/` — PDF/JPGはパンフレット由来で余白が大きいためトリミング・見やすくして使うこと。
 - `metro.config.js` で `.csv,.txt` を `assetExts` に追加済み。消さないこと。ファイルIOは `expo-file-system/legacy` (新APIではない)。
 - 公開前データの構造検証は `src/data/validateContent.ts`。

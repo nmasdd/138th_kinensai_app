@@ -476,7 +476,7 @@ export function VectorMapView({ floor, selectedId, locId, selfPos, roomsOverride
     if (selectedId == null) return false;
     if (r.id === selectedId) return true;
     const hit = hotspotForExhibitionId(selectedId);
-    if (hit && (hit.id === r.id || hit.sharedIds?.includes(r.id))) return true;
+    if (hit && (hit.id === r.id || hit.sharedIds?.includes(r.id) || hit.roomId === r.id)) return true;
     // 代表なしの部屋IDは一覧側で処理するため前方一致で判定しない
     return false;
   };

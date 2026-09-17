@@ -95,6 +95,8 @@ export function TopAppBar({ title, headTitle }: { title: string; headTitle?: str
   const { type } = useM3();
   // メニュー画面では同じボタンが「閉じる」として働く (トグル)
   const onMenu = usePathname() === '/menu';
+  // 通知画面では同じボタンが「閉じる」として働く (トグル)
+  const onNotifications = usePathname().startsWith('/notifications');
   return (
     <View style={styles.appBar} accessibilityRole="header">
       {/* Web のブラウザタブに表示するタイトル (headTitle 未指定なら画面名) */}
@@ -114,10 +116,10 @@ export function TopAppBar({ title, headTitle }: { title: string; headTitle?: str
         {title}
       </Text>
       <Pressable
-        accessibilityLabel="通知を開く"
+        accessibilityLabel={onNotifications ? '通知を閉じる' : '通知を開く'}
         accessibilityRole="button"
         android_ripple={{ color: 'rgba(0,0,0,0.12)', borderless: true }}
-        onPress={() => router.push('/notifications')}
+        onPress={() => (onNotifications ? goBackOrHome() : router.push('/notifications'))}
         style={styles.appBarIcon}
       >
         <M3Icon name="notifications" />

@@ -14,10 +14,23 @@ export interface StageItem {
   delayMinutes: number;
 }
 
-function parseCsv(csv: string): StageItem[] {
+/**
+ * ステージ (野外ステージ) の演目IDの接頭辞。
+ * 講堂CSVのIDは行番号 (数字) のため、講堂と共有する上書き・遅延データ
+ * (`timetable-overrides.json` / `delays.json`) で衝突しないよう区別する。
+ */
+export const STAGE_ID_PREFIX = 'stage-';
+
+/** IDがステージ (CSV) 由来かを返す。 */
+export function isStageId(id: string): boolean {
+  return id.startsWith(STAGE_ID_PREFIX);
+}
+
+/** "team,day,start,end" (任意で先頭ID) を解析する。4列のIDは idPrefix + 行番号。 */
+function parseCsv(csv: string, idPrefix = ''): StageItem[] {
   return csv
     .trim()
-    .split('\n')
+    .split(/\r?\n/)
     .map((line, index) => {
       const parts = line.split(',').map((p) => p.trim());
       if (parts.length === 5) {
@@ -32,7 +45,7 @@ function parseCsv(csv: string): StageItem[] {
       }
       if (parts.length === 4) {
         return {
-          id: String(index),
+          id: `${idPrefix}${index}`,
           team: parts[0],
           day: parseInt(parts[1], 10),
           start: parts[2],
@@ -45,9 +58,10 @@ function parseCsv(csv: string): StageItem[] {
     .filter((v): v is StageItem => v !== null);
 }
 
-export async function loadAuditoriumBase(): Promise<StageItem[]> {
+/** 同梱のタイムテーブルCSV (`time/*.csv`) を読み込む。 */
+async function loadCsvAsset(module: number, idPrefix = ''): Promise<StageItem[]> {
   try {
-    const asset = Asset.fromModule(require('../../time/Auditorium.csv'));
+    const asset = Asset.fromModule(module);
     await asset.downloadAsync();
     const uri = asset.localUri ?? (asset as { uri?: string }).uri;
     if (!uri) return [];
@@ -64,22 +78,35 @@ export async function loadAuditoriumBase(): Promise<StageItem[]> {
     } else {
       text = await FileSystem.readAsStringAsync(uri);
     }
-    return parseCsv(text);
+    return parseCsv(text, idPrefix);
   } catch {
     return [];
   }
 }
 
+/** 講堂タイムテーブル (`time/Auditorium.csv`) の同梱値。 */
+export async function loadAuditoriumBase(): Promise<StageItem[]> {
+  return loadCsvAsset(require('../../time/Auditorium.csv'));
+}
+
+/** ステージタイムテーブル (`time/Stage.csv`) の同梱値。出演は1団体につき複数行になり得る。 */
+export async function loadStageBase(): Promise<StageItem[]> {
+  return loadCsvAsset(require('../../time/Stage.csv'), STAGE_ID_PREFIX);
+}
+
 /**
- * 講堂タイムテーブルの管理者上書き。
- * time/Auditorium.csv は同梱アセットで上書き不可のため、
- * 追加・編集・削除の差分を kvStore に保存し、読込時にマージする。
+ * タイムテーブル (講堂 `time/Auditorium.csv` / ステージ `time/Stage.csv`) の管理者上書き。
+ * CSV は同梱アセットで上書き不可のため、追加・編集・削除の差分を kvStore に保存し、
+ * 読込時にマージする。ステージのIDは `stage-` 接頭辞で講堂と区別する。
  */
 export interface TimetableOverrides {
   added: StageItem[];
   edited: Record<string, Partial<StageItem>>;
   deleted: string[];
 }
+
+/** タイムテーブルの会場。 */
+export type TimetableVenue = 'auditorium' | 'stage';
 
 const TIMETABLE_OVERRIDES_KEY = 'timetable-overrides.json';
 
@@ -102,8 +129,20 @@ export async function saveTimetableOverrides(overrides: TimetableOverrides): Pro
   await saveJSON(TIMETABLE_OVERRIDES_KEY, overrides);
 }
 
-/** CSV解析結果に管理者の差分をマージする */
-export function mergeTimetable(base: StageItem[], overrides: TimetableOverrides): StageItem[] {
+/** 追加分のIDから会場を判定する (ステージは `stage-` 接頭辞、それ以外は講堂)。 */
+export function venueOfId(id: string): TimetableVenue {
+  return isStageId(id) ? 'stage' : 'auditorium';
+}
+
+/**
+ * CSV解析結果に管理者の差分をマージする。
+ * `venue` の追加分だけを対象にする (削除・編集はIDが会場ごとに一意なため共通)。
+ */
+export function mergeTimetable(
+  base: StageItem[],
+  overrides: TimetableOverrides,
+  venue: TimetableVenue = 'auditorium',
+): StageItem[] {
   const deleted = new Set(overrides.deleted);
   const merged = base
     .filter((it) => !deleted.has(it.id))
@@ -118,23 +157,41 @@ export function mergeTimetable(base: StageItem[], overrides: TimetableOverrides)
         end: typeof patch.end === 'string' && patch.end ? patch.end : it.end,
       };
     });
-  return [...merged, ...overrides.added.filter((it) => !deleted.has(it.id))];
+  const added = overrides.added.filter((it) => !deleted.has(it.id) && venueOfId(it.id) === venue);
+  return [...merged, ...added];
+}
+
+/** 遅延分数を反映する。 */
+function applyDelays(items: StageItem[], delayMap: Record<string, number>): StageItem[] {
+  return items.map((it) => ({ ...it, delayMinutes: delayMap[it.id] ?? it.delayMinutes ?? 0 }));
 }
 
 export async function loadAuditorium(): Promise<StageItem[]> {
   const delayMap = await loadDelayMap().catch((): Record<string, number> => ({}));
-  const applyDelays = (items: StageItem[]): StageItem[] =>
-    items.map((it) => ({ ...it, delayMinutes: delayMap[it.id] ?? it.delayMinutes ?? 0 }));
   const [base, overrides] = await Promise.all([
     loadAuditoriumBase(),
     loadTimetableOverrides().catch((): TimetableOverrides => ({ added: [], edited: {}, deleted: [] })),
   ]);
-  return applyDelays(mergeTimetable(base, overrides));
+  return applyDelays(mergeTimetable(base, overrides, 'auditorium'), delayMap);
 }
 
 /**
- * 講堂タイムテーブルの遅延分数 (管理者ページから保存)。
- * キーは StageItem.id (4列CSVでは行番号の文字列表現)。
+ * ステージタイムテーブルを読み込む。講堂と同じ差し替え (上書き・遅延) を適用する。
+ * 出演団体の紹介文などのメタ情報は `stage-groups.json` (`stage.ts`) を正とし、
+ * 時間割は `time/Stage.csv` を正とする。
+ */
+export async function loadStage(): Promise<StageItem[]> {
+  const delayMap = await loadDelayMap().catch((): Record<string, number> => ({}));
+  const [base, overrides] = await Promise.all([
+    loadStageBase(),
+    loadTimetableOverrides().catch((): TimetableOverrides => ({ added: [], edited: {}, deleted: [] })),
+  ]);
+  return applyDelays(mergeTimetable(base, overrides, 'stage'), delayMap);
+}
+
+/**
+ * タイムテーブルの遅延分数 (管理者ページから保存)。
+ * キーは StageItem.id (講堂はCSVの行番号、ステージは `stage-<行番号>`)。
  */
 const DELAY_KEY = 'delays.json';
 

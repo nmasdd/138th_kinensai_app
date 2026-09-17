@@ -15,12 +15,15 @@ import {
   loadAuditoriumBase,
   loadDelayMap,
   loadNowOverride,
+  loadStageBase,
   loadTimetableOverrides,
   mergeTimetable,
   saveDelayMap,
   saveNowOverride,
   saveTimetableOverrides,
+  STAGE_ID_PREFIX,
   type StageItem,
+  type TimetableVenue,
 } from '../../data/timetable';
 import { loadCongestion, saveCongestion, type CongestionLevel } from '../../data/congestion';
 import {
@@ -77,12 +80,13 @@ function AdminStageContent() {
     intro: '',
     genre: '',
     imageUri: null as string | null,
-    day: undefined as number | undefined,
-    start: '',
-    end: '',
-    delay: '0',
   });
-  const [ttBase, setTtBase] = useState<StageItem[]>([]);
+  /** タイムテーブル編集の対象会場 */
+  const [ttVenue, setTtVenue] = useState<TimetableVenue>('auditorium');
+  const [ttBase, setTtBase] = useState<Record<TimetableVenue, StageItem[]>>({
+    auditorium: [],
+    stage: [],
+  });
   const [ttAdded, setTtAdded] = useState<StageItem[]>([]);
   const [ttEdited, setTtEdited] = useState<Record<string, Partial<StageItem>>>({});
   const [ttDeleted, setTtDeleted] = useState<string[]>([]);
@@ -92,19 +96,28 @@ function AdminStageContent() {
   const [congestion, setCongestion] = useState<CongestionLevel>('unknown');
   const { notice, showOk, showErr } = useAdminNotice();
 
-  const auditorium = useMemo(() => mergeTimetable(ttBase, { added: ttAdded, edited: ttEdited, deleted: ttDeleted }), [
-    ttBase,
-    ttAdded,
-    ttEdited,
-    ttDeleted,
-  ]);
+  const ttOverrides = useMemo(
+    () => ({ added: ttAdded, edited: ttEdited, deleted: ttDeleted }),
+    [ttAdded, ttEdited, ttDeleted],
+  );
+  /** 選択中の会場のタイムテーブル (差分適用済み) */
+  const timetable = useMemo(
+    () => mergeTimetable(ttBase[ttVenue], ttOverrides, ttVenue),
+    [ttBase, ttVenue, ttOverrides],
+  );
+  /** 講堂タイムテーブル (いま開催中の手動選択で使う。会場切替の影響を受けない) */
+  const auditorium = useMemo(
+    () => mergeTimetable(ttBase.auditorium, ttOverrides, 'auditorium'),
+    [ttBase, ttOverrides],
+  );
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [base, ttOverrides, delayMap, nowOverride, level, stageGroups, audGroupsRaw] = await Promise.all([
+        const [audBase, stageBase, ttOverrides, delayMap, nowOverride, level, stageGroups, audGroupsRaw] = await Promise.all([
           loadAuditoriumBase().catch(() => [] as StageItem[]),
+          loadStageBase().catch(() => [] as StageItem[]),
           loadTimetableOverrides().catch(() => ({ added: [] as StageItem[], edited: {}, deleted: [] as string[] })),
           loadDelayMap().catch(() => ({}) as Record<string, number>),
           loadNowOverride().catch(() => ({ auditoriumId: null as string | null })),
@@ -113,11 +126,13 @@ function AdminStageContent() {
           loadJSON<unknown>('auditorium-groups.json', null).catch(() => null),
         ]);
         if (cancelled) return;
-        setTtBase(base);
+        setTtBase({ auditorium: audBase, stage: stageBase });
         setTtAdded(ttOverrides.added);
         setTtEdited(ttOverrides.edited);
         setTtDeleted(ttOverrides.deleted);
-        const merged = mergeTimetable(base, ttOverrides);
+        const merged = mergeTimetable(audBase, ttOverrides, 'auditorium').concat(
+          mergeTimetable(stageBase, ttOverrides, 'stage'),
+        );
         const d: Record<string, string> = {};
         for (const it of merged) d[it.id] = String(delayMap[it.id] ?? it.delayMinutes ?? 0);
         setDelays(d);
@@ -144,6 +159,14 @@ function AdminStageContent() {
     return activeGroups.filter((g) => `${g.name} ${g.detail} ${g.intro ?? ''} ${g.genre ?? ''}`.includes(q));
   }, [activeGroups, query]);
 
+  const visibleTimetable = useMemo(() => {
+    const q = query.trim();
+    if (!q) return timetable;
+    return timetable.filter((it) =>
+      `${it.team} ${it.start} ${it.end} ${it.day === 0 ? '土' : '日'}`.includes(q),
+    );
+  }, [timetable, query]);
+
   const visibleAuditorium = useMemo(() => {
     const q = query.trim();
     if (!q) return auditorium;
@@ -159,25 +182,14 @@ function AdminStageContent() {
     intro: '',
     genre: '',
     imageUri: null as string | null,
-    day: undefined as number | undefined,
-    start: '',
-    end: '',
-    delay: '0',
   };
 
   const saveGroupForm = async (): Promise<string> => {
     if (!groupDraft.name.trim()) throw new Error('団体名を入力してください');
-    const start = groupDraft.start.trim();
-    const end = groupDraft.end.trim();
-    const hasTime = start.length > 0 || end.length > 0;
-    // 講堂の演目はタイムテーブル (CSV) を正とするため、時刻はステージのみ扱う
+    // 演目の時間割は下の「タイムテーブル」で編集する (CSVを正とする)
     const isAuditorium = groupKind === 'auditorium';
-    if (!isAuditorium && hasTime && (!/^\d{1,2}:\d{2}$/.test(start) || !/^\d{1,2}:\d{2}$/.test(end))) {
-      throw new Error('時刻は HH:MM 形式で入力してください');
-    }
     try {
       const id = groupDraft.id ?? `${isAuditorium ? 'aud' : 'group'}-${Date.now()}`;
-      const delay = parseInt(groupDraft.delay, 10);
       const item: StageGroup = {
         id,
         name: groupDraft.name.trim(),
@@ -185,10 +197,6 @@ function AdminStageContent() {
         intro: groupDraft.intro.trim() || undefined,
         genre: groupDraft.genre.trim() || undefined,
         imageUri: groupDraft.imageUri,
-        day: !isAuditorium && (groupDraft.day === 0 || groupDraft.day === 1) ? groupDraft.day : undefined,
-        start: !isAuditorium && hasTime ? start : undefined,
-        end: !isAuditorium && hasTime ? end : undefined,
-        delayMinutes: !isAuditorium && Number.isFinite(delay) && delay > 0 ? delay : 0,
       };
       const source = isAuditorium ? audGroups : groups;
       const next = groupDraft.id ? source.map((g) => (g.id === id ? item : g)) : [...source, item];
@@ -267,7 +275,8 @@ function AdminStageContent() {
       return Promise.reject(new Error('時刻は HH:MM 形式で入力してください'));
     }
     const item: StageItem = {
-      id: `custom-${Date.now()}`,
+      // ステージの追加分はIDに接頭辞を付け、講堂の追加分と区別する
+      id: `${ttVenue === 'stage' ? STAGE_ID_PREFIX : ''}custom-${Date.now()}`,
       team: ttDraft.team.trim(),
       day: ttDraft.day,
       start: ttDraft.start.trim(),
@@ -358,11 +367,9 @@ function AdminStageContent() {
                 })}
               </View>
             </Field>
-            {groupKind === 'auditorium' ? (
-              <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
-                講堂の演目（団体名・時間割）は下の「講堂タイムテーブル」で編集します。ここでは紹介文・写真などの詳細を編集します。
-              </Text>
-            ) : null}
+            <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
+              演目の時間割は下の「タイムテーブル」で編集します。ここでは紹介文・写真などの詳細を編集します。
+            </Text>
             {visibleGroups.map((g) => (
               <View key={g.id} style={adminStyles.row}>
                 <View style={adminStyles.rowText}>
@@ -384,10 +391,6 @@ function AdminStageContent() {
                       intro: g.intro ?? '',
                       genre: g.genre ?? '',
                       imageUri: g.imageUri ?? null,
-                      day: g.day,
-                      start: g.start ?? '',
-                      end: g.end ?? '',
-                      delay: typeof g.delayMinutes === 'number' ? String(g.delayMinutes) : '0',
                     })
                   }
                 >
@@ -452,76 +455,6 @@ function AdminStageContent() {
                   onChange={(uri) => setGroupDraft((p) => ({ ...p, imageUri: uri }))}
                 />
               </Field>
-              {groupKind === 'stage' ? (
-                <>
-                  <Field label="ステージ演目の曜日">
-                    <View style={adminStyles.chips}>
-                      {[
-                        { value: undefined, label: '未定' },
-                        { value: 0, label: '土' },
-                        { value: 1, label: '日' },
-                      ].map((o) => {
-                        const active = groupDraft.day === o.value;
-                        return (
-                          <M3Touch
-                            key={String(o.value)}
-                            onPress={() => setGroupDraft((p) => ({ ...p, day: o.value }))}
-                            label={o.label}
-                            round
-                          >
-                            <View style={[adminStyles.chip, active && adminStyles.chipActive]}>
-                              <Text
-                                style={[
-                                  type.labelLarge,
-                                  { color: active ? m3.onPrimaryContainer : m3.onSurfaceVariant },
-                                ]}
-                              >
-                                {o.label}
-                              </Text>
-                            </View>
-                          </M3Touch>
-                        );
-                      })}
-                    </View>
-                  </Field>
-                  <View style={adminStyles.timeRow}>
-                    <View style={adminStyles.timeField}>
-                      <Field label="開始 (HH:MM)">
-                        <TextInput
-                          style={adminStyles.input}
-                          value={groupDraft.start}
-                          onChangeText={(t) => setGroupDraft((p) => ({ ...p, start: t }))}
-                          placeholder="例: 12:15"
-                          placeholderTextColor={m3.onSurfaceVariant}
-                        />
-                      </Field>
-                    </View>
-                    <View style={adminStyles.timeField}>
-                      <Field label="終了 (HH:MM)">
-                        <TextInput
-                          style={adminStyles.input}
-                          value={groupDraft.end}
-                          onChangeText={(t) => setGroupDraft((p) => ({ ...p, end: t }))}
-                          placeholder="例: 12:45"
-                          placeholderTextColor={m3.onSurfaceVariant}
-                        />
-                      </Field>
-                    </View>
-                  </View>
-                  <Field label="遅延分数">
-                    <View style={adminStyles.delayRow}>
-                      <TextInput
-                        style={adminStyles.delayInput}
-                        value={groupDraft.delay}
-                        keyboardType="number-pad"
-                        onChangeText={(t) => setGroupDraft((p) => ({ ...p, delay: t.replace(/[^0-9]/g, '') }))}
-                        accessibilityLabel="ステージ演目の遅延分数"
-                      />
-                      <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>分</Text>
-                    </View>
-                  </Field>
-                </>
-              ) : null}
               <View style={adminStyles.buttonRow}>
                 <M3Button
                   label={groupKind === 'auditorium' ? '講堂団体を保存' : 'ステージ団体を保存'}
@@ -537,8 +470,39 @@ function AdminStageContent() {
             </View>
           </Section>
 
-          <Section title="講堂タイムテーブル (遅延分数)">
-            {visibleAuditorium.map((it) => {
+          <Section title="タイムテーブル (追加・編集・削除・遅延)">
+            <Field label="会場">
+              <View style={adminStyles.chips}>
+                {(
+                  [
+                    { value: 'stage', label: 'ステージ' },
+                    { value: 'auditorium', label: '講堂' },
+                  ] as const
+                ).map((o) => {
+                  const active = ttVenue === o.value;
+                  return (
+                    <M3Touch
+                      key={o.value}
+                      onPress={() => {
+                        setTtVenue(o.value);
+                        setTtDraft({ team: '', day: 0, start: '', end: '' });
+                      }}
+                      label={o.label}
+                      round
+                    >
+                      <View style={[adminStyles.chip, active && adminStyles.chipActive]}>
+                        <Text
+                          style={[type.labelLarge, { color: active ? m3.onPrimaryContainer : m3.onSurfaceVariant }]}
+                        >
+                          {o.label}
+                        </Text>
+                      </View>
+                    </M3Touch>
+                  );
+                })}
+              </View>
+            </Field>
+            {visibleTimetable.map((it) => {
               const patch = ttEdited[it.id];
               const isAdded = ttAdded.some((a) => a.id === it.id);
               const team = patch?.team ?? it.team;
@@ -635,9 +599,9 @@ function AdminStageContent() {
                 </View>
               );
             })}
-            {visibleAuditorium.length === 0 ? (
+            {visibleTimetable.length === 0 ? (
               <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
-                {auditorium.length === 0 ? 'タイムテーブルが読み込めませんでした' : '一致する演目はありません'}
+                {timetable.length === 0 ? 'タイムテーブルが読み込めませんでした' : '一致する演目はありません'}
               </Text>
             ) : null}
             <View style={adminStyles.block}>

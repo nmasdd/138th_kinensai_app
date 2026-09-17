@@ -12,6 +12,7 @@ import {
   findNow,
   loadAuditorium,
   loadNowOverride,
+  loadStage,
   resolveNow,
   timetableDayOfDate,
   toMinutes,
@@ -20,7 +21,6 @@ import {
 } from '../../data/timetable';
 import {
   auditoriumGroupsForItems,
-  groupStageItems,
   usePerformerGroups,
   type StageGroup,
 } from '../../data/stage';
@@ -28,15 +28,44 @@ import { loadCongestion, congestionLabel, type CongestionLevel } from '../../dat
 import { festival } from '../../data/festival';
 import PerformerDetailModal from '../../components/PerformerDetailModal';
 
-// Google カレンダー風の時間グリッド設定 (1分あたりの高さ・既定の表示範囲)
-const PX_PER_MIN = 1.2;
+// Google カレンダー風の時間グリッド設定。
+// 演目と待ち時間で「時間→高さ」の比率を変え、長い演目や待ち時間を詰める。
+// 演目：1分あたり ITEM_PX_PER_MIN。最小/最大高さで挟む。
+const ITEM_PX_PER_MIN = 4;
+// 待ち時間 (演目と演目の間)：1分あたり GAP_PX_PER_MIN で圧縮する。
+const GAP_PX_PER_MIN = 1;
+// この尺 (分) 以下の演目は名前の隣に時間を並べた1行表示にする。
+const SHORT_EVENT_MAX_MINUTES = 10;
+// 2行表示の演目の最小高さ。
+const MIN_EVENT_H = 40;
+// 1行表示 (10分以下) の演目の最小高さ。
+const SHORT_EVENT_H = 26;
+// 演目1件の最大高さ。長い演目を圧縮して全体を短くする。
+const MAX_EVENT_H = 88;
+// 待ち時間の最小/最大高さ (ブロックの間隔を保ちつつ長い休憩を詰める)。
+const MIN_GAP_H = 6;
+const MAX_GAP_H = 20;
 const DEFAULT_START = 8 * 60;
 const DEFAULT_END = 18 * 60;
 const GUTTER = 56;
-const MIN_EVENT_H = 40;
 const DAY_LABELS = ['土曜日', '日曜日'];
 const THEME_NAMES = ['音楽祭', '海神'];
 const VENUE_LABELS = ['ステージ', '講堂'];
+
+/** 演目の尺 (分)。不正なら負値。 */
+function durationOf(item: StageItem): number {
+  return toMinutes(item.end) - toMinutes(item.start);
+}
+
+/** 名前の隣に時間を出す1行表示にするか (短い演目) */
+function isShortEvent(item: StageItem): boolean {
+  const d = durationOf(item);
+  return d > 0 && d <= SHORT_EVENT_MAX_MINUTES;
+}
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.min(Math.max(v, min), max);
+}
 
 function formatHour(min: number): string {
   return `${String(Math.floor(min / 60)).padStart(2, '0')}:00`;
@@ -70,56 +99,136 @@ interface PositionedEvent {
 }
 
 /**
- * 重なる演目を列に振り分ける (Google カレンダーと同じく横並び表示)。
- * 時間が重ならないまとまり (クラスタ) ごとに貪欲法で列番号を割り当てる。
+ * 時間軸の区間。`from`〜`to` (分) を 1分あたり `pxPerMin` で `top` から描画する。
+ * 演目区間と待ち時間区間で縮尺が異なる。
+ */
+interface ScaleSegment {
+  from: number;
+  to: number;
+  top: number;
+  pxPerMin: number;
+}
+
+/** 区間列で「分」を縦位置 (px) に変換する。区間外は端に丸める。 */
+function yOf(segments: ScaleSegment[], minute: number, total: number): number {
+  if (segments.length === 0) return 0;
+  if (minute <= segments[0].from) return 0;
+  for (const s of segments) {
+    if (minute <= s.to) return s.top + (minute - s.from) * s.pxPerMin;
+  }
+  return total;
+}
+
+interface ScaleOptions {
+  /** 演目の1分あたりの高さ */
+  itemPxPerMin: number;
+  /** 待ち時間の1分あたりの高さ (圧縮用) */
+  gapPxPerMin: number;
+  /** 2行表示の演目の最小高さ */
+  minItemH: number;
+  /** 1行表示の演目の最小高さ */
+  shortItemH: number;
+  /** 演目1件の最大高さ */
+  maxItemH: number;
+  /** 待ち時間の最小高さ */
+  minGapH: number;
+  /** 待ち時間の最大高さ */
+  maxGapH: number;
+}
+
+interface TimeScale {
+  events: PositionedEvent[];
+  segments: ScaleSegment[];
+  total: number;
+}
+
+interface ClusterItem {
+  item: StageItem;
+  start: number;
+  end: number;
+  col: number;
+  cols: number;
+}
+
+/**
+ * 演目と待ち時間で縮尺を変えた時間軸を組み立てる。
+ * - 演目：1分あたり `itemPxPerMin`。ただし1行/2行表示の最小高さと
+ *   `maxItemH` (長い演目の圧縮) で挟む。
+ * - 待ち時間：1分あたり `gapPxPerMin` で圧縮し、`minGapH`/`maxGapH` で挟む。
+ * 区間の並びは実時間の順序を保つため、縦位置は前後関係が正しいまま短くなる。
+ * 重なる演目はクラスタごとに列分割して横並びにする。
  */
 function layoutEvents(
   items: StageItem[],
   rangeStart: number,
-  pxPerMin: number,
-  minEventH: number,
-): PositionedEvent[] {
-  const sorted = [...items].sort(
-    (a, b) => toMinutes(a.start) + a.delayMinutes - (toMinutes(b.start) + b.delayMinutes),
-  );
-  const out: PositionedEvent[] = [];
-  let cluster: { item: StageItem; start: number; end: number }[] = [];
-  let clusterEnd = -1;
+  rangeEnd: number,
+  opt: ScaleOptions,
+): TimeScale {
+  const sorted = items
+    .map((item) => {
+      const start = toMinutes(item.start) + item.delayMinutes;
+      const end = Math.max(start + 1, toMinutes(item.end) + item.delayMinutes);
+      return { item, start, end };
+    })
+    .sort((a, b) => a.start - b.start);
 
-  const flush = () => {
+  const segments: ScaleSegment[] = [];
+  const placements: ClusterItem[] = [];
+  const gapHeight = (minutes: number) => clamp(minutes * opt.gapPxPerMin, opt.minGapH, opt.maxGapH);
+  let cursor = rangeStart;
+  let top = 0;
+
+  const pushSegment = (from: number, to: number, height: number) => {
+    if (to <= from || height <= 0) return;
+    segments.push({ from, to, top, pxPerMin: height / (to - from) });
+    top += height;
+  };
+
+  let i = 0;
+  while (i < sorted.length) {
+    // 時間が重なる演目をまとめて1クラスタにする (列分割表示の単位)
+    const cluster = [sorted[i]];
+    let end = sorted[i].end;
+    let j = i + 1;
+    while (j < sorted.length && sorted[j].start < end) {
+      cluster.push(sorted[j]);
+      end = Math.max(end, sorted[j].end);
+      j += 1;
+    }
+    const start = Math.min(...cluster.map((c) => c.start));
+    if (start > cursor) pushSegment(cursor, start, gapHeight(start - cursor));
+    const minH = Math.max(...cluster.map((c) => (isShortEvent(c.item) ? opt.shortItemH : opt.minItemH)));
+    pushSegment(start, end, clamp((end - start) * opt.itemPxPerMin, minH, opt.maxItemH));
+
+    // 列の割り当て (重ならないクラスタでは常に1列)
     const colEnds: number[] = [];
-    const placed = cluster.map((c) => {
-      let col = colEnds.findIndex((end) => end <= c.start);
+    for (const c of cluster) {
+      let col = colEnds.findIndex((colEnd) => colEnd <= c.start);
       if (col === -1) {
         col = colEnds.length;
         colEnds.push(c.end);
       } else {
         colEnds[col] = c.end;
       }
-      return { ...c, col };
-    });
-    for (const p of placed) {
-      out.push({
-        item: p.item,
-        top: (p.start - rangeStart) * pxPerMin,
-        height: Math.max(minEventH, (p.end - p.start) * pxPerMin),
-        col: p.col,
-        cols: colEnds.length,
-      });
+      placements.push({ ...c, col, cols: 0 });
     }
-    cluster = [];
-    clusterEnd = -1;
-  };
-
-  for (const it of sorted) {
-    const start = toMinutes(it.start) + it.delayMinutes;
-    const end = Math.max(start + 18, toMinutes(it.end) + it.delayMinutes);
-    if (cluster.length > 0 && start >= clusterEnd) flush();
-    cluster.push({ item: it, start, end });
-    clusterEnd = Math.max(clusterEnd, end);
+    for (let k = placements.length - cluster.length; k < placements.length; k += 1) {
+      placements[k].cols = colEnds.length;
+    }
+    cursor = end;
+    i = j;
   }
-  if (cluster.length > 0) flush();
-  return out;
+  if (cursor < rangeEnd) pushSegment(cursor, rangeEnd, gapHeight(rangeEnd - cursor));
+
+  const at = (minute: number) => yOf(segments, minute, top);
+  const events = placements.map((c) => ({
+    item: c.item,
+    top: at(c.start),
+    height: Math.max(1, at(c.end) - at(c.start)),
+    col: c.col,
+    cols: c.cols,
+  }));
+  return { events, segments, total: top };
 }
 
 /** 講堂の混雑レベルに応じた色 (M3ロール)。 */
@@ -173,29 +282,50 @@ function StageCalendar({
   base,
   now,
   nowId,
+  canOpenItem,
+  onOpenItem,
 }: {
   items: StageItem[];
   day: number;
   base: { start: number; end: number };
   now: Date;
   nowId: string | null;
+  /** 演目ブロックをタップして詳細を開けるか (出演団体情報がある演目のみ) */
+  canOpenItem?: (item: StageItem) => boolean;
+  /** 演目ブロックのタップ (出演団体の詳細モーダルを開く) */
+  onOpenItem?: (item: StageItem) => void;
 }) {
   const { type, scale } = useM3();
   const styles = useStyles();
   // 時間グリッドの内部ジオメトリも画面幅に追従させる
-  const pxPerMin = PX_PER_MIN * scale;
   const gutter = scaled(GUTTER, scale);
-  const minEventH = scaled(MIN_EVENT_H, scale);
+  const shortEventH = scaled(SHORT_EVENT_H, scale);
   const edge = scaled(12, scale);
   const hourLabelWidth = gutter - scaled(10, scale);
   const hourLabelOffset = scaled(8, scale);
   const nowDotSize = scaled(10, scale);
   const range = useMemo(() => rangeOf(items, base), [items, base]);
-  const positioned = useMemo(
-    () => layoutEvents(items, range.start, pxPerMin, minEventH),
-    [items, range.start, pxPerMin, minEventH],
+  // 演目 (ITEM_PX_PER_MIN) と待ち時間 (GAP_PX_PER_MIN) で比率を変えた時間軸。
+  // 長い演目は MAX_EVENT_H で、待ち時間は MAX_GAP_H で詰めて全体を短くする。
+  const timeScale = useMemo(
+    () =>
+      layoutEvents(items, range.start, range.end, {
+        itemPxPerMin: ITEM_PX_PER_MIN * scale,
+        gapPxPerMin: GAP_PX_PER_MIN * scale,
+        minItemH: scaled(MIN_EVENT_H, scale),
+        shortItemH: shortEventH,
+        maxItemH: scaled(MAX_EVENT_H, scale),
+        minGapH: scaled(MIN_GAP_H, scale),
+        maxGapH: scaled(MAX_GAP_H, scale),
+      }),
+    [items, range.start, range.end, scale, shortEventH],
   );
-  const totalHeight = (range.end - range.start) * pxPerMin;
+  const positioned = timeScale.events;
+  const totalHeight = timeScale.total;
+  const yAt = useCallback(
+    (minute: number) => yOf(timeScale.segments, minute, timeScale.total),
+    [timeScale],
+  );
   const hours = useMemo(() => {
     const arr: number[] = [];
     for (let m = range.start; m <= range.end; m += 60) arr.push(m);
@@ -205,12 +335,12 @@ function StageCalendar({
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const showNow =
     timetableDayOfDate(now) === day && nowMinutes >= range.start && nowMinutes <= range.end;
-  const nowTop = (nowMinutes - range.start) * pxPerMin;
+  const nowTop = yAt(nowMinutes);
 
   return (
     <View style={[styles.calBody, { height: totalHeight }]}>
       {hours.map((m) => {
-        const top = (m - range.start) * pxPerMin;
+        const top = yAt(m);
         return (
           <React.Fragment key={`hour-${m}`}>
             <View style={[styles.calHourLine, { top, left: gutter, right: edge }]} />
@@ -227,6 +357,42 @@ function StageCalendar({
         {positioned.map((p) => {
           const isNow = p.item.id === nowId;
           const showDelay = p.item.delayMinutes > 0;
+          // 短い演目は縦に2行入らないため、名前の隣に時間を並べた1行表示にする
+          const short = isShortEvent(p.item);
+          const label = `${p.item.team} ${p.item.start}から${p.item.end}${showDelay ? ` ${delayStatusText(p.item.delayMinutes)}` : ''}`;
+          const boxStyle = [styles.calEvent, short && styles.calEventShort, isNow && styles.calEventNow];
+          const content = short ? (
+            <View style={styles.calEventLine}>
+              <Text style={[type.titleSmall, styles.calEventTitle, styles.calEventNameInline]} numberOfLines={1}>
+                {p.item.team}
+              </Text>
+              <Text
+                style={[type.labelMedium, showDelay ? styles.calEventTimeDelay : styles.calEventTime]}
+                numberOfLines={1}
+              >
+                {p.item.start}–{p.item.end}
+                {showDelay ? `・${delayStatusText(p.item.delayMinutes)}` : ''}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Text style={[type.titleSmall, styles.calEventTitle]} numberOfLines={1}>
+                {p.item.team}
+              </Text>
+              <Text style={[type.labelMedium, styles.calEventTime]} numberOfLines={1}>
+                {p.item.start}–{p.item.end}
+              </Text>
+              {showDelay ? (
+                <View style={styles.calDelay}>
+                  <Text style={[type.labelMedium, { color: m3.onErrorContainer }]} numberOfLines={1}>
+                    {delayStatusText(p.item.delayMinutes)}
+                  </Text>
+                </View>
+              ) : null}
+            </>
+          );
+          // 出演団体情報がある演目はタップで詳細を開ける (海神のブロック等は対象外)
+          const openable = !!onOpenItem && !!canOpenItem?.(p.item);
           return (
             <View
               key={p.item.id}
@@ -235,24 +401,19 @@ function StageCalendar({
                 { top: p.top, height: p.height, left: `${(p.col / p.cols) * 100}%`, width: `${100 / p.cols}%` },
               ]}
             >
-              <View
-                style={[styles.calEvent, isNow && styles.calEventNow]}
-                accessibilityLabel={`${p.item.team} ${p.item.start}から${p.item.end}${showDelay ? ` ${delayStatusText(p.item.delayMinutes)}` : ''}`}
-              >
-                <Text style={[type.titleSmall, styles.calEventTitle]} numberOfLines={1}>
-                  {p.item.team}
-                </Text>
-                <Text style={[type.labelMedium, styles.calEventTime]} numberOfLines={1}>
-                  {p.item.start}–{p.item.end}
-                </Text>
-                {showDelay ? (
-                  <View style={styles.calDelay}>
-                    <Text style={[type.labelMedium, { color: m3.onErrorContainer }]} numberOfLines={1}>
-                      {delayStatusText(p.item.delayMinutes)}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
+              {openable ? (
+                <M3Touch
+                  onPress={() => onOpenItem?.(p.item)}
+                  label={`${p.item.team}の詳細を表示`}
+                  style={boxStyle}
+                >
+                  {content}
+                </M3Touch>
+              ) : (
+                <View style={boxStyle} accessibilityLabel={label}>
+                  {content}
+                </View>
+              )}
             </View>
           );
         })}
@@ -271,7 +432,16 @@ function StageCalendar({
   );
 }
 
-function GroupCard({ group, onPress }: { group: StageGroup; onPress: () => void }) {
+function GroupCard({
+  group,
+  onPress,
+  showThumb = true,
+}: {
+  group: StageGroup;
+  onPress: () => void;
+  /** 写真の欄を表示するか */
+  showThumb?: boolean;
+}) {
   const { type } = useM3();
   const styles = useStyles();
   return (
@@ -282,13 +452,15 @@ function GroupCard({ group, onPress }: { group: StageGroup; onPress: () => void 
       style={styles.groupCardTouch}
     >
       <View style={styles.groupCard}>
-        {group.imageUri ? (
-          <Image source={{ uri: group.imageUri }} style={styles.groupThumb} resizeMode="cover" />
-        ) : (
-          <View style={[styles.groupThumb, styles.groupThumbEmpty]}>
-            <M3Icon name="groups" color={m3.onSecondaryContainer} />
-          </View>
-        )}
+        {showThumb ? (
+          group.imageUri ? (
+            <Image source={{ uri: group.imageUri }} style={styles.groupThumb} resizeMode="cover" />
+          ) : (
+            <View style={[styles.groupThumb, styles.groupThumbEmpty]}>
+              <M3Icon name="groups" color={m3.onSecondaryContainer} />
+            </View>
+          )
+        ) : null}
         <View style={styles.groupInfo}>
           <Text style={[type.titleMedium, { color: m3.onSurface }]} numberOfLines={1}>
             {group.name}
@@ -308,10 +480,13 @@ function PerformerList({
   groups,
   onSelect,
   title = '出演団体',
+  showThumb = true,
 }: {
   groups: StageGroup[];
   onSelect: (g: StageGroup) => void;
   title?: string;
+  /** 写真の欄を表示するか (写真を持たない一覧では省ける) */
+  showThumb?: boolean;
 }) {
   const { type } = useM3();
   const styles = useStyles();
@@ -326,7 +501,7 @@ function PerformerList({
         ) : (
           groups.map((g, i) => (
             <Stagger key={g.id} index={i % 10}>
-              <GroupCard group={g} onPress={() => onSelect(g)} />
+              <GroupCard group={g} onPress={() => onSelect(g)} showThumb={showThumb} />
             </Stagger>
           ))
         )}
@@ -339,6 +514,7 @@ export default function TimetableScreen() {
   const { type } = useM3();
   const styles = useStyles();
   const [items, setItems] = useState<StageItem[]>([]);
+  const [stageItems, setStageItems] = useState<StageItem[]>([]);
   const [congestion, setCongestion] = useState<CongestionLevel>('unknown');
   const [isLoading, setIsLoading] = useState(true);
   const [now, setNow] = useState(() => new Date());
@@ -359,6 +535,27 @@ export default function TimetableScreen() {
     setDetailVisible(true);
   }, []);
 
+  // 演目名 → 出演団体のメタ情報。タイムテーブルのブロックをタップしたときに使う。
+  // 該当がない演目 (海神のブロック等) は詳細を開かない。
+  const stageByName = useMemo(() => new Map(stageGroups.map((g) => [g.name, g])), [stageGroups]);
+  const auditoriumByName = useMemo(
+    () => new Map(auditoriumMeta.map((g) => [g.name, g])),
+    [auditoriumMeta],
+  );
+  const performerForItem = useCallback(
+    (item: StageItem): StageGroup | null =>
+      (venue === 0 ? stageByName : auditoriumByName).get(item.team) ?? null,
+    [venue, stageByName, auditoriumByName],
+  );
+  const canOpenItem = useCallback((item: StageItem) => performerForItem(item) !== null, [performerForItem]);
+  const openItemDetail = useCallback(
+    (item: StageItem) => {
+      const group = performerForItem(item);
+      if (group) openDetail(group);
+    },
+    [performerForItem, openDetail],
+  );
+
   // 管理者ページの保存・公開コンテンツの更新を即反映する。
   // 赤線・強調を動かすため現在時刻も1分ごとに更新する。
   useContentEffect(() => {
@@ -366,11 +563,13 @@ export default function TimetableScreen() {
     setNow(new Date());
     Promise.all([
       loadAuditorium().catch(() => []),
+      loadStage().catch(() => []),
       loadCongestion().catch(() => 'unknown' as CongestionLevel),
       loadNowOverride().catch((): NowOverride => ({ auditoriumId: null })),
-    ]).then(([auditorium, level, nowOverride]) => {
+    ]).then(([auditorium, stage, level, nowOverride]) => {
       if (cancelled) return;
       setItems(auditorium);
+      setStageItems(stage);
       setCongestion(level);
       setOverride(nowOverride);
       setIsLoading(false);
@@ -385,8 +584,7 @@ export default function TimetableScreen() {
   const nowItem = resolveNow(items, now, override);
   const dayItems = useMemo(() => items.filter((i) => i.day === day), [items, day]);
 
-  // ステージ出演団体のうち日時が確定しているものを講堂と同じ時間割で描画する
-  const stageItems = useMemo(() => groupStageItems(stageGroups), [stageGroups]);
+  // ステージの時間割は time/Stage.csv を正とする (1団体が1日に複数回出演し得る)
   const stageDayItems = useMemo(() => stageItems.filter((i) => i.day === day), [stageItems, day]);
   const stageNow = findNow(stageItems, now);
 
@@ -445,7 +643,15 @@ export default function TimetableScreen() {
                 {stageDayItems.length === 0 ? (
                   <CalendarEmpty label="ステージの演目は準備中です" />
                 ) : (
-                  <StageCalendar items={stageDayItems} day={day} base={baseRange} now={now} nowId={stageNow?.id ?? null} />
+                  <StageCalendar
+                    items={stageDayItems}
+                    day={day}
+                    base={baseRange}
+                    now={now}
+                    nowId={stageNow?.id ?? null}
+                    canOpenItem={canOpenItem}
+                    onOpenItem={openItemDetail}
+                  />
                 )}
               </View>
             </Rise>
@@ -462,7 +668,7 @@ export default function TimetableScreen() {
                 </View>
                 {day === 1 ? (
                   <Text style={[type.bodyMedium, { color: m3.onSurfaceVariant }]}>
-                    日曜企画（クラブ・有志）は時間未定のため一覧のみ表示しています
+                    午前はクラブ有志企画、午後はゲーム実況解説大会「海神」です
                   </Text>
                 ) : null}
               </View>
@@ -470,19 +676,27 @@ export default function TimetableScreen() {
                 {dayItems.length === 0 ? (
                   <CalendarEmpty label="講堂の演目は準備中です" />
                 ) : (
-                  <StageCalendar items={dayItems} day={day} base={baseRange} now={now} nowId={nowItem?.id ?? null} />
+                  <StageCalendar
+                    items={dayItems}
+                    day={day}
+                    base={baseRange}
+                    now={now}
+                    nowId={nowItem?.id ?? null}
+                    canOpenItem={canOpenItem}
+                    onOpenItem={openItemDetail}
+                  />
                 )}
               </View>
             </Rise>
             {day === 1 ? (
               <>
                 <PerformerList
-                  groups={auditoriumGroups.filter((g) => g.genre === 'スマブラ')}
+                  groups={auditoriumMeta.filter((g) => g.genre === 'スマブラ')}
                   onSelect={openDetail}
                   title="出演者（スマブラ）"
                 />
                 <PerformerList
-                  groups={auditoriumGroups.filter((g) => g.genre === 'スプラトゥーン')}
+                  groups={auditoriumMeta.filter((g) => g.genre === 'スプラトゥーン')}
                   onSelect={openDetail}
                   title="出演者（スプラトゥーン）"
                 />
@@ -490,6 +704,7 @@ export default function TimetableScreen() {
                   groups={auditoriumMeta.filter((g) => g.genre === 'クラブ')}
                   onSelect={openDetail}
                   title="日曜企画（クラブ・有志）"
+                  showThumb={false}
                 />
               </>
             ) : (
@@ -571,8 +786,12 @@ function createStyles(s: number, shape: M3Shape) {
       overflow: 'hidden',
     },
     calEventNow: { backgroundColor: m3.tertiaryContainer, borderLeftColor: m3.primary },
+    calEventShort: { paddingVertical: scaled(3, s) },
+    calEventLine: { flexDirection: 'row', alignItems: 'center', gap: scaled(8, s) },
+    calEventNameInline: { flexShrink: 1 },
     calEventTitle: { color: m3.onPrimaryContainer },
     calEventTime: { color: m3.onPrimaryContainer },
+    calEventTimeDelay: { color: m3.onErrorContainer },
     calDelay: {
       alignSelf: 'flex-start',
       backgroundColor: m3.errorContainer,

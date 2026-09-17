@@ -9,6 +9,8 @@ import { withContentImage } from './contentImages';
 
 /**
  * 出演団体。ステージ (野外ステージ) と講堂でデータを分けて管理する。
+ * 時間割は `time/Stage.csv` (ステージ) / `time/Auditorium.csv` (講堂) を正とし、
+ * ここには詳細モーダル用の紹介文・写真・ジャンルなどのメタ情報を持たせる。
  * 詳細モーダルで紹介文・写真を表示するため、`detail` (短い紹介) とは別に
  * `intro` (モーダル用の長い紹介文) を持つ。
  */
@@ -22,20 +24,11 @@ export interface StageGroup {
   genre?: string;
   /** 管理者ページで登録した画像 (file:// URI または dataURL)。なければ null */
   imageUri?: string | null;
-  /** 演目の曜日 (0=土, 1=日)。未定なら undefined */
-  day?: number;
-  /** 開始時刻 "HH:MM"。未定なら undefined */
-  start?: string;
-  /** 終了時刻 "HH:MM"。未定なら undefined */
-  end?: string;
-  /** 遅延分数 (既定0)。リアルタイム配信が来たらここに反映する */
-  delayMinutes?: number;
 }
 
 /**
- * ステージ (野外ステージ) 出演団体。日時が確定しているものは
- * タイムテーブルの時間割として描画する。
- * 本データが来たらここを差し替える (現在は動作確認用サンプル)。
+ * ステージ (野外ステージ) 出演団体。時間割は `time/Stage.csv` を正とし、
+ * ここには紹介文・写真などのメタ情報を持たせる。
  */
 export const bundledGroups: StageGroup[] = stageGroupsJson as StageGroup[];
 
@@ -45,28 +38,6 @@ export const bundledGroups: StageGroup[] = stageGroupsJson as StageGroup[];
  * 同じ団体名が両方にあれば講堂タブで紹介文を表示できる。
  */
 export const bundledAuditoriumGroups: StageGroup[] = auditoriumGroupsJson as StageGroup[];
-
-/**
- * 日時が確定している出演団体をタイムテーブル用の演目に変換する。
- * day/start/end が未設定の団体は時間割に載せない (出演団体一覧には表示)。
- */
-export function groupStageItems(groups: StageGroup[]): StageItem[] {
-  const timeRe = /^\d{1,2}:\d{2}$/;
-  const out: StageItem[] = [];
-  for (const g of groups) {
-    if ((g.day === 0 || g.day === 1) && timeRe.test(g.start ?? '') && timeRe.test(g.end ?? '')) {
-      out.push({
-        id: g.id,
-        team: g.name,
-        day: g.day,
-        start: g.start as string,
-        end: g.end as string,
-        delayMinutes: typeof g.delayMinutes === 'number' && g.delayMinutes > 0 ? g.delayMinutes : 0,
-      });
-    }
-  }
-  return out;
-}
 
 const VOTES_KEY = 'stage-votes.json';
 const GROUPS_KEY = 'stage-groups.json';

@@ -1,61 +1,38 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Image, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { M3Card, M3EmptyState, M3FAB, M3FilterChip, M3Icon, M3ImagePlaceholder, M3LoadingView, M3SearchBar, M3Touch, TopAppBar, m3scrim } from '../../components/m3';
 import { FadeOverlay, Pop, Rise, ScreenFade, Stagger } from '../../components/anim';
 import ExhibitionDetailModal from '../../components/ExhibitionDetailModal';
-import { genreLabel, loadAllExhibitions, matchesGenre, displayClassName, type Exhibition } from '../../data/exhibitions';
+import { genreLabel, isStageOrAuditoriumProgram, loadAllExhibitions, matchesGenre, displayClassName, type Exhibition } from '../../data/exhibitions';
 import { useFavorites } from '../../data/favorites';
 import { useM3 } from '../../context/responsive';
 import { useContentEffect } from '../../context/useContentRefreshKey';
 import { m3, scaled } from '../../theme';
 
-type KindFilter = 'all' | 'class' | 'volunteer' | 'mogiten' | 'fav';
+type KindFilter = 'class' | 'volunteer' | 'mogiten' | 'fav';
 
 const KIND_LABEL: Record<KindFilter, string> = {
-  all: 'すべて',
   class: 'クラス企画',
   volunteer: '有志企画',
   mogiten: '模擬店',
   fav: 'お気に入り',
 };
 
-type GenreFilter =
-  | 'all'
-  | '演劇'
-  | 'テーマツアー'
-  | 'パフォーマンス'
-  | '展示'
-  | '実演発表'
-  | '体験企画'
-  | '販売・配布'
-  | '研究発表'
-  | 'クラブ'
-  | 'パロディ'
-  | 'アクション'
-  | '謎解き・脱出'
-  | 'ヒューマンドラマ'
-  | '映像作品'
-  | 'アドベンチャー'
-  | '占い';
+/** 1段目: 企画の種別。同一段内は OR で絞り込む */
+const KIND_FILTERS: KindFilter[] = ['class', 'volunteer', 'mogiten', 'fav'];
 
-/** クラス企画の大分類と有志企画の区分 (パンフレットの分類軸) */
-const GENRE_FILTERS: GenreFilter[] = [
-  'all',
-  '演劇',
-  'テーマツアー',
-  'パフォーマンス',
-  '展示',
+/** 2段目: パンフレットの主要ジャンル。同一段内は OR で絞り込む */
+const MAJOR_GENRE_FILTERS = ['演劇', 'テーマツアー', 'パフォーマンス', '展示'];
+
+/** 3段目: 残りのジャンル (有志区分とクラス企画の細分)。同一段内は OR で絞り込む */
+const OTHER_GENRE_FILTERS = [
   '実演発表',
   '体験企画',
   '販売・配布',
   '研究発表',
   'クラブ',
-];
-
-/** クラス企画カード下部の細分ジャンル (パンフレット p.23) */
-const SUBGENRE_FILTERS: GenreFilter[] = [
   'パロディ',
   'アクション',
   '謎解き・脱出',
@@ -65,29 +42,13 @@ const SUBGENRE_FILTERS: GenreFilter[] = [
   '占い',
 ];
 
-const GENRE_LABEL: Record<GenreFilter, string> = {
-  all: 'すべて',
-  演劇: '演劇',
-  テーマツアー: 'テーマツアー',
-  パフォーマンス: 'パフォーマンス',
-  展示: '展示',
-  実演発表: '実演発表',
-  体験企画: '体験企画',
-  '販売・配布': '販売・配布',
-  研究発表: '研究発表',
-  クラブ: 'クラブ',
-  パロディ: 'パロディ',
-  アクション: 'アクション',
-  '謎解き・脱出': '謎解き・脱出',
-  ヒューマンドラマ: 'ヒューマンドラマ',
-  映像作品: '映像作品',
-  アドベンチャー: 'アドベンチャー',
-  占い: '占い',
-};
-
 function isMogiten(ex: Exhibition): boolean {
   if (typeof ex.mogiten === 'boolean') return ex.mogiten;
   return /模擬店|屋台|フード|軽食|喫茶|カフェ/.test(`${ex.className}${ex.projectName}${ex.description}`);
+}
+
+function toggleValue<T>(list: T[], value: T): T[] {
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
 export default function SearchScreen() {
@@ -97,9 +58,10 @@ export default function SearchScreen() {
   const [exhibitions, setExhibitions] = useState<Exhibition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [query, setQuery] = useState('');
-  const [kind, setKind] = useState<KindFilter>(filter === 'mogiten' ? 'mogiten' : 'all');
-  const [genre, setGenre] = useState<GenreFilter>('all');
-  const [filterOpen, setFilterOpen] = useState(filter === 'mogiten');
+  const [kinds, setKinds] = useState<KindFilter[]>(filter === 'mogiten' ? ['mogiten'] : []);
+  const [majorGenres, setMajorGenres] = useState<string[]>([]);
+  const [otherGenres, setOtherGenres] = useState<string[]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const { isFavorite, toggle } = useFavorites();
@@ -107,16 +69,25 @@ export default function SearchScreen() {
   // 詳細直開きの自動オープンは「未オープンの target」に一度だけ行う。
   // 画面に再フォーカスしたらリセットし、再訪時は同じ target でも開き直せるようにする。
   const openedExhibitRef = useRef<string | null>(null);
+  const listRef = useRef<FlatList<Exhibition>>(null);
+
+  // 検索ページを開くたびに絞り込み・キーワードを初期状態へ戻し、先頭から表示する。
+  // 模擬店リンク (filter=mogiten) のときだけ模擬店で絞り込む。
+  const resetToInitialState = useCallback(() => {
+    setQuery('');
+    setMajorGenres([]);
+    setOtherGenres([]);
+    setKinds(filter === 'mogiten' ? ['mogiten'] : []);
+    setFilterOpen(false);
+    setTimeout(() => listRef.current?.scrollToOffset({ offset: 0, animated: false }), 0);
+  }, [filter]);
+
+  useFocusEffect(resetToInitialState);
 
   // 管理者ページの保存・公開コンテンツの更新を即反映する
-  // QuickNav/メニューからの再訪でも filter/exhibit を同期する
   useContentEffect(() => {
     let cancelled = false;
     openedExhibitRef.current = null;
-    if (filter === 'mogiten') {
-      setKind('mogiten');
-      setFilterOpen(true);
-    }
     loadAllExhibitions()
       .catch(() => [])
       .then((list) => {
@@ -133,16 +104,19 @@ export default function SearchScreen() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return exhibitions.filter((ex) => {
-      if (kind === 'class') {
-        if (ex.kind !== 'class' || isMogiten(ex)) return false;
-      } else if (kind === 'volunteer') {
-        if (ex.kind !== 'volunteer') return false;
-      } else if (kind === 'mogiten') {
-        if (!isMogiten(ex)) return false;
-      } else if (kind === 'fav') {
-        if (!isFavorite(ex.id)) return false;
+      // 講堂・ステージの企画はタイムテーブル側で扱うため検索に出さない
+      if (isStageOrAuditoriumProgram(ex)) return false;
+      if (kinds.length > 0) {
+        const kindMatch = kinds.some((k) => {
+          if (k === 'class') return ex.kind === 'class' && !isMogiten(ex);
+          if (k === 'volunteer') return ex.kind === 'volunteer';
+          if (k === 'mogiten') return isMogiten(ex);
+          return isFavorite(ex.id);
+        });
+        if (!kindMatch) return false;
       }
-      if (!matchesGenre(ex, genre)) return false;
+      if (majorGenres.length > 0 && !majorGenres.some((g) => matchesGenre(ex, g))) return false;
+      if (otherGenres.length > 0 && !otherGenres.some((g) => matchesGenre(ex, g))) return false;
       if (!q) return true;
       return (
         ex.className.toLowerCase().includes(q) ||
@@ -151,7 +125,7 @@ export default function SearchScreen() {
         (genreLabel(ex) ?? '').toLowerCase().includes(q)
       );
     });
-  }, [exhibitions, query, kind, genre, isFavorite]);
+  }, [exhibitions, query, kinds, majorGenres, otherGenres, isFavorite]);
 
   const selected = useMemo(
     () => (selectedId ? exhibitions.find((ex) => ex.id === selectedId) ?? null : null),
@@ -160,7 +134,7 @@ export default function SearchScreen() {
 
   // お気に入りを先頭に寄せる安定ソート (絞り込み・検索後の順序を保持)
   const sorted = useMemo(() => {
-    if (kind === 'fav') return filtered;
+    if (kinds.length === 1 && kinds[0] === 'fav') return filtered;
     return filtered
       .map((ex, index) => ({ ex, index }))
       .sort((a, b) => {
@@ -169,7 +143,7 @@ export default function SearchScreen() {
         return a.index - b.index;
       })
       .map(({ ex }) => ex);
-  }, [filtered, kind, isFavorite]);
+  }, [filtered, kinds, isFavorite]);
 
   // 他画面からの詳細直開き: /search?exhibit=<id> で一致があれば自動で開く
   // modalVisible を依存に含めないことで、閉じた直後の再オープンを防ぐ
@@ -216,27 +190,57 @@ export default function SearchScreen() {
                 <M3Icon name="close" size={24} color={m3.onSurfaceVariant} />
               </M3Touch>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-              <M3FilterChip
-                key="all"
-                label={KIND_LABEL.all}
-                selected={kind === 'all' && genre === 'all'}
-                onPress={() => {
-                  setKind('all');
-                  setGenre('all');
-                }}
-              />
-              {(Object.keys(KIND_LABEL) as KindFilter[])
-                .filter((k) => k !== 'all')
-                .map((k) => (
-                  <M3FilterChip key={k} label={KIND_LABEL[k]} selected={kind === k} onPress={() => setKind(k)} />
-                ))}
-              {GENRE_FILTERS.filter((g) => g !== 'all').map((g) => (
-                <M3FilterChip key={g} label={GENRE_LABEL[g]} selected={genre === g} onPress={() => setGenre(g)} />
-              ))}
-              {SUBGENRE_FILTERS.map((g) => (
-                <M3FilterChip key={g} label={GENRE_LABEL[g]} selected={genre === g} onPress={() => setGenre(g)} />
-              ))}
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.chipGroup}>
+              <View style={styles.chipSection}>
+                <Text style={[type.titleSmall, styles.sectionLabel]}>企画</Text>
+                <View style={styles.chipRow}>
+                  <M3FilterChip label="すべて" selected={kinds.length === 0} onPress={() => setKinds([])} />
+                  {KIND_FILTERS.map((k) => (
+                    <M3FilterChip
+                      key={k}
+                      label={KIND_LABEL[k]}
+                      selected={kinds.includes(k)}
+                      onPress={() => setKinds((prev) => toggleValue(prev, k))}
+                    />
+                  ))}
+                </View>
+              </View>
+              <View style={styles.chipSection}>
+                <Text style={[type.titleSmall, styles.sectionLabel]}>種類</Text>
+                <View style={styles.chipRow}>
+                  <M3FilterChip
+                    label="すべて"
+                    selected={majorGenres.length === 0}
+                    onPress={() => setMajorGenres([])}
+                  />
+                  {MAJOR_GENRE_FILTERS.map((g) => (
+                    <M3FilterChip
+                      key={g}
+                      label={g}
+                      selected={majorGenres.includes(g)}
+                      onPress={() => setMajorGenres((prev) => toggleValue(prev, g))}
+                    />
+                  ))}
+                </View>
+              </View>
+              <View style={styles.chipSection}>
+                <Text style={[type.titleSmall, styles.sectionLabel]}>タグ</Text>
+                <View style={styles.chipRow}>
+                  <M3FilterChip
+                    label="すべて"
+                    selected={otherGenres.length === 0}
+                    onPress={() => setOtherGenres([])}
+                  />
+                  {OTHER_GENRE_FILTERS.map((g) => (
+                    <M3FilterChip
+                      key={g}
+                      label={g}
+                      selected={otherGenres.includes(g)}
+                      onPress={() => setOtherGenres((prev) => toggleValue(prev, g))}
+                    />
+                  ))}
+                </View>
+              </View>
             </ScrollView>
           </Pop>
         </FadeOverlay>
@@ -250,6 +254,7 @@ export default function SearchScreen() {
       </Rise>
       <View style={styles.listWrap}>
         <FlatList
+          ref={listRef}
           data={sorted}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
@@ -285,7 +290,9 @@ export default function SearchScreen() {
           ListEmptyComponent={
             <M3EmptyState icon="search">
               <Text style={[type.bodyLarge, { color: m3.onSurfaceVariant, textAlign: 'center' }]}>
-                {kind === 'mogiten' ? '模擬店の出店情報は準備中です' : '一致する企画が見つかりません'}
+                {kinds.length === 1 && kinds[0] === 'mogiten'
+                  ? '模擬店の出店情報は準備中です'
+                  : '一致する企画が見つかりません'}
               </Text>
             </M3EmptyState>
           }
@@ -338,11 +345,16 @@ function createStyles(s: number) {
       justifyContent: 'center',
       alignItems: 'center',
     },
+    chipGroup: {
+      gap: scaled(16, s),
+      paddingBottom: scaled(4, s),
+    },
+    chipSection: { gap: scaled(8, s) },
+    sectionLabel: { color: m3.onSurfaceVariant },
     chipRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: scaled(8, s),
-      paddingBottom: scaled(4, s),
     },
     resultInfo: { paddingHorizontal: scaled(16, s), paddingVertical: scaled(12, s) },
     listWrap: { flex: 1 },

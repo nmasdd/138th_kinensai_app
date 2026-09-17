@@ -53,6 +53,18 @@ export function matchesGenre(ex: Exhibition, genre: string): boolean {
   return false;
 }
 
+/**
+ * 講堂・ステージ (野外ステージ) を会場とする企画か。
+ * これらはタイムテーブル (`time/Auditorium.csv` / `time/Stage.csv`) 側で扱うため
+ * 検索一覧から除外する。中庭など他会場を併記する企画は除外しない
+ * (例: オーケストラ部「講堂、ステージ、中庭」)。
+ */
+export function isStageOrAuditoriumProgram(ex: Exhibition): boolean {
+  const place = ex.place ?? '';
+  if (!/講堂|ステージ/.test(place)) return false;
+  return !/中庭/.test(place);
+}
+
 const CATALOG = CLASS_CATALOG;
 
 /**

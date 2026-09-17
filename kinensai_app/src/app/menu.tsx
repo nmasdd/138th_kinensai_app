@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { M3FAB, M3ListItem, TopAppBar, goBackOrHome, type IconName } from '../components/m3';
@@ -41,6 +41,9 @@ const ENTRIES: Entry[] = [
   },
 ];
 
+/** 閉じるボタン (FAB 56dp + 余白) が最後の項目に被らないための下余白。 */
+const FAB_CLEARANCE = 80;
+
 export default function MenuScreen() {
   const insets = useSafeAreaInsets();
   const styles = useStyles();
@@ -57,7 +60,11 @@ export default function MenuScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <TopAppBar title="メニュー" />
-      <View style={styles.body}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+      >
         {entries.map((e, i) => {
           const position: ListPosition =
             entries.length === 1 ? 'single' : i === 0 ? 'top' : i === entries.length - 1 ? 'bottom' : 'middle';
@@ -73,7 +80,7 @@ export default function MenuScreen() {
             </Stagger>
           );
         })}
-      </View>
+      </ScrollView>
       <View style={[styles.closeWrap, { bottom: Math.max(insets.bottom, 16) }]}>
         <M3FAB icon="close" label="メニューを閉じる" onPress={() => goBackOrHome()} />
       </View>
@@ -92,12 +99,14 @@ function createStyles(s: number) {
         ? { flexGrow: 0, flexShrink: 0, flexBasis: '100dvh' as unknown as number }
         : null),
     },
+    scroll: { flex: 1, minHeight: 0 },
     body: {
-      flex: 1,
-      minHeight: 0,
+      // 画面が高いときは中央寄せ、低いとき (iPhone SE 等) はスクロールできる
+      flexGrow: 1,
       justifyContent: 'center',
       padding: scaled(12, s),
-      overflow: 'hidden',
+      // 閉じるボタン (FAB) に最後の項目が隠れないよう余白を確保する
+      paddingBottom: scaled(12, s) + scaled(FAB_CLEARANCE, s),
     },
     closeWrap: {
       position: 'absolute',
