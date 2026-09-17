@@ -3,6 +3,7 @@ import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { displayClassName, genreLabel, type Exhibition } from '../data/exhibitions';
 import { ticketDistributionRoom } from '../data/mapRoomNotes';
+import { hotspotForExhibitionId } from '../data/mapHotspots';
 import { M3Button, M3Divider, M3Icon, M3ImagePlaceholder, M3Touch, m3scrim } from './m3';
 import { FadeOverlay, Pop } from './anim';
 import { m3, scaled } from '../theme';
@@ -25,7 +26,7 @@ interface Props {
   isFavorite: (id: string) => boolean;
   onToggleFavorite: (id: string) => void;
   onClose: () => void;
-  /** 検索などから「マップを開く」ボタンを表示するか */
+  /** 検索などから「マップを開く」ボタンを表示するか (マップ登録済み企画のみ) */
   showMapButton?: boolean;
 }
 
@@ -40,6 +41,7 @@ export default function ExhibitionDetailModal({
   const { type } = useM3();
   const styles = useStyles();
   const fav = exhibition ? isFavorite(exhibition.id) : false;
+  const mapped = exhibition ? hotspotForExhibitionId(exhibition.id) !== null : false;
   const openInMap = () => {
     if (!exhibition) return;
     onClose();
@@ -76,7 +78,7 @@ export default function ExhibitionDetailModal({
                 <Text style={[type.bodyMedium, { color: m3.onSurface }]}>場所: {exhibition.place}</Text>
               )}
               <View style={styles.favWrap}>
-                {showMapButton ? (
+                {showMapButton && mapped ? (
                   <M3Button label="マップを開く" icon="map" variant="outlined" onPress={openInMap} />
                 ) : null}
                 <M3Button
